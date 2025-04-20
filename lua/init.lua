@@ -1,21 +1,19 @@
 -- Expose user commands and keymaps
 
-require("ai_chat.conversation_manager").setup()
+require("code-assist.conversation-manager").setup()
 
 -- New conversation
-vim.api.nvim_create_user_command("AIChatNew", function()
-	local name, msgs = require("ai_chat.conversation_manager").new_conversation()
-	require("ai_chat.chat_window").open(name, msgs)
+vim.api.nvim_create_user_command("ChatNew", function()
+	local name, msgs = require("code-assist.conversation-manager").new_conversation()
+	require("code-assist.chat-window").open(name, msgs)
 end, {})
 
 -- Select existing conversation
-vim.api.nvim_create_user_command("AIChatSelect", function()
-	require("ai_chat.ui").select_conversation()
+vim.api.nvim_create_user_command("ChatSelect", function()
+	require("code-assist.ui").select_conversation()
 end, {})
 
 -- Alias :AIChat to selection, and <leader>a
-vim.api.nvim_create_user_command("AIChat", function()
-	require("ai_chat.ui").select_conversation()
+vim.api.nvim_create_user_command("Chat", function()
+	require("code-assist.ui").select_conversation()
 end, {})
-
-vim.keymap.set("n", "<leader>a", "<cmd>AIChatSelect<CR>", { desc = "Open AI Chat" })
