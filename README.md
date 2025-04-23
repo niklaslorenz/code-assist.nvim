@@ -4,6 +4,7 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
+- [ ] Response Streaming
 - [ ] Move rest of chat window control into chat window:
   - [ ] Conversation Manager event handling
 - [ ] Chat editing

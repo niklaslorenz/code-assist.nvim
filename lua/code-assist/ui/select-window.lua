@@ -67,7 +67,7 @@ end
 
 local function rename_hovered()
 	local name = get_hovered()
-	vim.ui.input({ prompt = "Rename " .. name .. " to:" }, function(input)
+	vim.ui.input({ prompt = "Rename", default = name }, function(input)
 		if not input then
 			return
 		end
