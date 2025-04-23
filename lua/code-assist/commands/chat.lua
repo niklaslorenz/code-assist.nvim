@@ -1,6 +1,10 @@
-local M = {}
+local ChatCommand = {}
 
-M.run = function(opts)
+local SelectWindow = require("code-assist.ui.select-window")
+local ConversationManager = require("code-assist.conversation-manager")
+local ChatWindow = require("code-assist.ui.chat-window")
+
+ChatCommand.run = function(opts)
 	-- parse args
 	local args = {}
 	for arg in string.gmatch(opts.args or "", "%S+") do
@@ -16,33 +20,28 @@ M.run = function(opts)
 	local is_new = (mode == "n" or mode == "new")
 	local is_select = (mode == "s" or mode == "select")
 	-- determine orientation
+	--- @type WindowOrientation
 	local orientation = "float"
 	if layout == "h" or layout == "horizontal" then
-		orientation = "horizontal"
+		orientation = "hsplit"
 	elseif layout == "v" or layout == "vertical" then
-		orientation = "vertical"
+		orientation = "vsplit"
 	end
-	local use_split = (orientation ~= "float")
 
 	if is_select then
-		-- selection UI opens and handles layout
-		require("code-assist.ui").select_conversation({ split = use_split, orientation = orientation })
-		return
-	end
-
-	-- load or create
-	local name, msgs
-	if is_new then
-		name, msgs = require("code-assist.conversation-manager").new_conversation()
+		SelectWindow.set_chat_orientation(orientation)
+		SelectWindow.open()
+	elseif is_new then
+		ConversationManager.new_conversation()
+		ChatWindow.open(orientation)
 	else
-		name, msgs = require("code-assist.conversation-manager").load_or_new()
+		ConversationManager.load_last_or_create_new()
+		ChatWindow.open(orientation)
 	end
-
-	require("code-assist.ui.chat-window").open(name, msgs, orientation)
 end
 
-M.setup = function()
-	vim.api.nvim_create_user_command("Chat", M.run, {
+ChatCommand.setup = function()
+	vim.api.nvim_create_user_command("Chat", ChatCommand.run, {
 		nargs = "*",
 		complete = function(ArgLead)
 			local opts = { "f", "h", "v", "n f", "n h", "n v", "s f", "s h", "s v" }
@@ -53,4 +52,4 @@ M.setup = function()
 	})
 end
 
-return M
+return ChatCommand

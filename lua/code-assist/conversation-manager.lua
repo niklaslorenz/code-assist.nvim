@@ -1,8 +1,20 @@
-local M = {}
+local ConversationManager = {}
+
+local EventDispatcher = require("code-assist.event-dispatcher")
+local ChatCompletions = require("code-assist.assistant.chat-completions")
+
 local fn = vim.fn
 local data_path = fn.stdpath("data") .. "/code-assist"
 local conv_path = data_path .. "/conversations"
 local last_conv_file = data_path .. "/last_conv"
+
+--- The model name to use for responses
+--- @type string
+local model = "gpt-4o-mini"
+
+--- The system message that new conversations are initialized with.
+--- @type string
+local initial_system_message = "You are a helpful programming assistant."
 
 ---@alias Role "user"|"assistant"|"system"
 
@@ -14,15 +26,13 @@ local last_conv_file = data_path .. "/last_conv"
 ---@field name string
 ---@field messages Message[]
 
----@alias ConversationUpdateEvent "append"|"switch"
+---@class ConversationUpdateEvent
+---@field operation "append"|"switch"
+---@field messages Message[]
 
 -- Current conversation state (nil if none yet)
 ---@type Conversation|nil
 local current_conversation = nil
-
---- Subscriber callbacks receive event, name, and messages
----@type fun(event: ConversationUpdateEvent, name: string, messages: Message[])[]
-local subscribers = {}
 
 ---Ensure that a directory exists.
 ---@param path string
@@ -32,51 +42,21 @@ local function ensure_dir(path)
 	end
 end
 
----Notify all subscribers with updated conversation data.
----@param event ConversationUpdateEvent
-local function notify(event)
-	if not current_conversation then
-		return
-	end
-	for _, cb in ipairs(subscribers) do
-		-- safe call with event, name, messages
-		pcall(cb, event, current_conversation.name, current_conversation.messages)
-	end
-end
-
----Subscribe to conversation updates.
----@param callback fun(event: ConversationUpdateEvent, name: string, messages: Message[])
-function M.subscribe(callback)
-	table.insert(subscribers, callback)
-end
-
----Unsubscribe from conversation updates.
----@param callback fun(event: ConversationUpdateEvent, name: string, messages: Message[])
-function M.unsubscribe(callback)
-	for i, f in ipairs(subscribers) do
-		if f == callback then
-			table.remove(subscribers, i)
-			return
-		end
-	end
-end
-
----Initialize manager and load last conversation if available.
-function M.setup()
-	ensure_dir(data_path)
-	ensure_dir(conv_path)
-	M.load_last_conversation()
-end
-
 ---Save the last conversation name to disk.
 ---@param name string
 local function save_last(name)
 	fn.writefile({ name }, last_conv_file)
 end
 
+---Initialize manager and load last conversation if available.
+function ConversationManager.setup()
+	ensure_dir(data_path)
+	ensure_dir(conv_path)
+end
+
 ---List all saved conversation names.
 ---@return string[]
-function M.list_conversations()
+function ConversationManager.list_conversations()
 	local files = fn.readdir(conv_path)
 	local convs = {}
 	for _, file in ipairs(files) do
@@ -91,15 +71,18 @@ end
 ---Load a saved conversation and notify subscribers.
 ---@param name string
 ---@return boolean success
-function M.load_conversation(name)
+function ConversationManager.load_conversation(name)
 	local fname = conv_path .. "/" .. name .. ".json"
-	if fn.filereadable(fname) == 1 then
+	if fn.filereadable(fname) ~= 0 then
 		local content = fn.readfile(fname)
 		local ok, data = pcall(fn.json_decode, table.concat(content, "\n"))
 		if ok and data.messages then
 			current_conversation = { name = name, messages = data.messages }
 			save_last(name)
-			notify("switch")
+			ConversationManager.on_conversation_update:dispatch({
+				operation = "switch",
+				messages = current_conversation.messages,
+			})
 			return true
 		end
 	end
@@ -108,51 +91,76 @@ end
 
 ---Load the last conversation (if exists).
 ---@return boolean success
-function M.load_last_conversation()
-	if fn.filereadable(last_conv_file) == 1 then
+function ConversationManager.load_last_conversation()
+	if fn.filereadable(last_conv_file) ~= 0 then
 		local lines = fn.readfile(last_conv_file)
 		local name = lines[1]
-		return M.load_conversation(name)
+		if current_conversation and current_conversation.name == name then
+			return true
+		end
+		return ConversationManager.load_conversation(name)
 	end
 	return false
 end
 
----Save the current conversation to disk.
-function M.save_current_conversation()
-	if not current_conversation then
-		return
+--- @return boolean success
+function ConversationManager.delete_conversation(name)
+	local fname = conv_path .. "/" .. name .. ".json"
+	if fn.filereadable(fname) == 0 then
+		return false
 	end
+	return fn.delete(fname) == 0
+end
+
+--- @return boolean success
+function ConversationManager.rename_conversation(name, new_name)
+	local fname = conv_path .. "/" .. name .. ".json"
+	if fn.filereadable(fname) == 0 then
+		return false
+	end
+	local new_fname = conv_path .. "/" .. new_name .. ".json"
+	if vim.fn.filereadable(new_fname) ~= 0 then
+		return false
+	end
+	return fn.rename(fname, new_fname) == 0
+end
+
+---Save the current conversation to disk.
+function ConversationManager.save_current_conversation()
+	assert(current_conversation)
 	local fname = conv_path .. "/" .. current_conversation.name .. ".json"
 	fn.writefile({ fn.json_encode({ messages = current_conversation.messages }) }, fname)
-	save_last(current_conversation.name)
 end
 
 ---Create a new conversation and notify subscribers.
----@return string name, Message[] messages
-function M.new_conversation()
+function ConversationManager.new_conversation()
 	local name = os.date("%Y-%m-%d_%H-%M-%S")
 	assert(type(name) == "string") -- needed for type checker
-	local messages = { { role = "system", content = "You are a helpful programming assistant." } }
+	local messages = { { role = "system", content = initial_system_message } }
 	current_conversation = { name = name, messages = messages }
-	M.save_current_conversation()
-	notify("switch")
-	return name, messages
+	ConversationManager.save_current_conversation()
+	save_last(name)
+	ConversationManager.on_conversation_update:dispatch({
+		operation = "switch",
+		messages = current_conversation.messages,
+	})
 end
 
 ---Load last or create new conversation.
----@return string name, Message[] messages
-function M.load_or_new()
-	if M.load_last_conversation() and current_conversation then
-		return current_conversation.name, current_conversation.messages
+--- @return boolean loaded
+function ConversationManager.load_last_or_create_new()
+	if not ConversationManager.load_last_conversation() then
+		ConversationManager.new_conversation()
+		return false
 	end
-	return M.new_conversation()
+	return true
 end
 
 ---Append a message to the current conversation, save, and notify.
 ---@param message Message
 ---@param name string? Optional conversation name to verify
 ---@return boolean success, string? reason
-function M.append_message(message, name)
+function ConversationManager.append_message(message, name)
 	if not current_conversation then
 		return false, "no current conversation"
 	end
@@ -160,15 +168,31 @@ function M.append_message(message, name)
 		return false, "conversation mismatch"
 	end
 	table.insert(current_conversation.messages, message)
-	M.save_current_conversation()
-	notify("append")
+	ConversationManager.save_current_conversation()
+	ConversationManager.on_conversation_update:dispatch({ operation = "append", messages = { message } })
 	return true
 end
 
 ---Get the current conversation.
 ---@return Conversation|nil
-function M.get_current_conversation()
+function ConversationManager.get_current_conversation()
 	return current_conversation
 end
 
-return M
+--- Generate a response for the current conversation.
+function ConversationManager.generate_response()
+	assert(current_conversation)
+	local conversation_name = current_conversation.name
+	ChatCompletions.create_response(model, current_conversation.messages, function(response)
+		if response then
+			ConversationManager.append_message(response, conversation_name)
+		else
+			ConversationManager.append_message({ role = "assistant", content = "[Error fetching response]" })
+		end
+	end)
+end
+
+--- @type EventDispatcher<ConversationUpdateEvent>
+ConversationManager.on_conversation_update = EventDispatcher.new()
+
+return ConversationManager

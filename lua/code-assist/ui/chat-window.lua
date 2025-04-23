@@ -1,59 +1,144 @@
--- Renders the floating chat buffer and handles I/O with OpenAI
+local ChatWindow = {}
 
-local model = "gpt-4o-mini"
+--- @alias WindowOrientation "hsplit"|"vsplit"|"float"
 
-local M = {}
-local cm = require("code-assist.conversation-manager")
+--- @alias WindowDisplayEvent "show"|"hide"
 
-local chat_buf, chat_win, messages, conv_name
+--- @alias ChatKeymapFunction fun(win: integer, buf: integer)
 
+local EventDispatcher = require("code-assist.event-dispatcher")
+
+--- Setup the chat buffer or setup a new one if one exists already.
+--- @return integer buffer
+local function create_buffer()
+	local buf = vim.api.nvim_create_buf(false, true)
+	vim.bo[buf].filetype = "markdown"
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].swapfile = false
+	vim.bo[buf].modifiable = false
+	return buf
+end
+
+--- The nvim chat buffer
+--- @type integer
+local chat_buf = create_buffer()
+
+--- The nvim chat window
+--- @type integer | nil
+local chat_win = nil
+
+--- The messages displayed in the window
+--- @type Message[]
+local messages = {}
+
+--- Highlighting namespace
 local ns = vim.api.nvim_create_namespace("code-assist")
 
-local function eventListener() end
-local function append_message(role, content)
-	vim.bo[chat_buf].modifiable = true
+--- Get the chat window if it is valid.
+--- @return integer|nil window
+local function get_win()
+	if chat_win and vim.api.nvim_win_is_valid(chat_win) then
+		return chat_win
+	end
+	return nil
+end
 
-	local header = (role == "user" and "You:" or "Assistant:")
+--- Print a message to the buffer
+--- @param message Message
+local function print_message(message)
+	local header = (message.role == "user" and "You:" or "Assistant:")
 	local line_count = vim.api.nvim_buf_line_count(chat_buf)
 	vim.api.nvim_buf_set_lines(chat_buf, line_count, line_count, false, { header })
-
-	local h1_group = (role == "user" and "ChatUser" or "ChatAssistant")
+	local h1_group = (message.role == "user" and "ChatUser" or "ChatAssistant")
 	vim.api.nvim_buf_add_highlight(chat_buf, ns, h1_group, line_count, 0, -1)
-
 	local body_lines = {}
-	for _, ln in ipairs(vim.split(content, "\n")) do
+	for _, ln in ipairs(vim.split(message.content, "\n")) do
 		table.insert(body_lines, "  " .. ln)
 	end
 	vim.api.nvim_buf_set_lines(chat_buf, line_count + 1, line_count + 1, false, body_lines)
+end
 
-	vim.api.nvim_win_set_cursor(chat_win, { vim.api.nvim_buf_line_count(chat_buf), 0 })
+--- Clear the chat display (not the messages held by the window).
+local function clear_buffer()
+	vim.bo[chat_buf].modifiable = true
+	local line_count = vim.api.nvim_buf_line_count(chat_buf)
+	vim.api.nvim_buf_set_lines(chat_buf, 0, line_count, true, {})
+	vim.bo[chat_buf].modifiable = false
+	ChatWindow.scroll_to_bottom()
+end
 
+--- Redraw the chat window.
+local function redraw()
+	clear_buffer()
+	vim.bo[chat_buf].modifiable = true
+	for _, m in ipairs(messages) do
+		print_message(m)
+	end
 	vim.bo[chat_buf].modifiable = false
 end
 
-function M.open(name, msgs, orientation)
-	conv_name = name
-	messages = msgs
+--- Append a message to the chat window.
+--- @param message Message
+function ChatWindow.append_message(message)
+	table.insert(messages, message)
+	vim.bo[chat_buf].modifiable = true
+	print_message(message)
+	vim.bo[chat_buf].modifiable = false
+	ChatWindow.scroll_to_bottom()
+end
 
-	-- If already open, jump there
-	if chat_win and vim.api.nvim_win_is_valid(chat_win) then
-		vim.api.nvim_set_current_win(chat_win)
+--- Scroll the chat window to the bottom.
+function ChatWindow.scroll_to_bottom()
+	local win = get_win()
+	if win then
+		vim.api.nvim_win_set_cursor(win, { vim.api.nvim_buf_line_count(chat_buf), 0 })
+	end
+end
+
+--- Replace the current messages in the chat window.
+--- @param new_messages Message[]
+function ChatWindow.replace_messages(new_messages)
+	messages = {}
+	for _, m in ipairs(new_messages) do
+		table.insert(messages, m)
+	end
+	redraw()
+	ChatWindow.scroll_to_bottom()
+end
+
+--- Hide the chat window.
+function ChatWindow.hide()
+	local win = get_win()
+	if not win then
 		return
 	end
+	vim.api.nvim_win_close(win, true)
+	ChatWindow.on_visibility_change:dispatch("hide")
+end
 
-	chat_buf = vim.api.nvim_create_buf(false, true)
-	if orientation == "horizontal" then
+--- Show the chat window.
+--- @param orientation WindowOrientation
+function ChatWindow.open(orientation)
+	-- If already open, jump there
+	local win = get_win()
+	if win then
+		vim.api.nvim_set_current_win(win)
+		return
+	end
+	-- Create the window
+	if orientation == "hsplit" then
 		vim.cmd("split")
-		chat_win = vim.api.nvim_get_current_win()
-	elseif orientation == "vertical" then
+		win = vim.api.nvim_get_current_win()
+	elseif orientation == "vsplit" then
 		vim.cmd("vsplit")
-		chat_win = vim.api.nvim_get_current_win()
+		win = vim.api.nvim_get_current_win()
 	else
 		local w = math.floor(vim.o.columns * 0.6)
 		local h = math.floor(vim.o.lines * 0.6)
 		local row = math.floor((vim.o.lines - h) / 2)
 		local col = math.floor((vim.o.columns - w) / 2)
-		chat_win = vim.api.nvim_open_win(chat_buf, true, {
+		local temp_buf = vim.api.nvim_create_buf(false, true)
+		win = vim.api.nvim_open_win(temp_buf, true, {
 			relative = "editor",
 			width = w,
 			height = h,
@@ -63,52 +148,24 @@ function M.open(name, msgs, orientation)
 			border = "rounded",
 		})
 	end
+	chat_win = win
+	vim.wo[win].wrap = true
+	vim.wo[win].linebreak = true
+	vim.api.nvim_win_set_buf(win, chat_buf)
+	redraw()
+	ChatWindow.on_visibility_change:dispatch("show")
+end
 
-	vim.api.nvim_win_set_buf(chat_win, chat_buf)
-	vim.bo[chat_buf].filetype = "markdown"
-	vim.bo[chat_buf].buftype = "nofile"
-	vim.bo[chat_buf].swapfile = false
-	vim.bo[chat_buf].bufhidden = "wipe"
-	vim.bo[chat_buf].modifiable = false
-	vim.wo[chat_win].wrap = true
-	vim.wo[chat_win].linebreak = true
-
-	-- Populate existing messages
-	for _, msg in ipairs(messages) do
-		if msg.role ~= "system" then
-			append_message(msg.role, msg.content)
-		end
-	end
-
-	-- Close & save on q
-	vim.keymap.set("n", "q", function()
-		vim.api.nvim_win_close(chat_win, true)
-		cm.save(conv_name, messages)
-	end, { buffer = chat_buf })
-
-	-- <Enter> to send a prompt
-	vim.keymap.set("n", "<CR>", function()
-		vim.ui.input({ prompt = "You: " }, function(input)
-			if not input then
-				return
-			end
-
-			-- Append user message
-			table.insert(messages, { role = "user", content = input })
-			append_message("user", input)
-			cm.save(conv_name, messages)
-
-			-- Call OpenAI
-			local response = require("code-assist.assistant.chat-completions").create_response(model, messages)
-			if response then
-				table.insert(messages, { role = "assistant", content = response })
-				append_message("assistant", response)
-				cm.save(conv_name, messages)
-			else
-				append_message("assistant", "[Error fetching response]")
-			end
-		end)
+--- Create a new keymap for the chat window.
+--- @param key string
+--- @param func fun()
+function ChatWindow.add_keymap(key, func)
+	vim.keymap.set("n", key, function()
+		func()
 	end, { buffer = chat_buf })
 end
 
-return M
+--- @type EventDispatcher<WindowDisplayEvent>
+ChatWindow.on_visibility_change = EventDispatcher.new()
+
+return ChatWindow
