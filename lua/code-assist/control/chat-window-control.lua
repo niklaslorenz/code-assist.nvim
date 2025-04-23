@@ -16,25 +16,6 @@ local function filter_chat_messages(messages)
 	return filtered
 end
 
-local function prompt_user_message()
-	vim.ui.input({ prompt = "You: " }, function(input)
-		if not input then
-			return
-		end
-		ConversationManager.append_message({ role = "user", content = input })
-		ConversationManager.generate_response()
-	end)
-end
-
-local function setup_keymaps()
-	ChatWindow.add_keymap("q", function()
-		ChatWindow.hide()
-	end)
-	ChatWindow.add_keymap("<CR>", function()
-		prompt_user_message()
-	end)
-end
-
 local function setup_conversation_manager_events()
 	ConversationManager.on_conversation_update:subscribe(function(event)
 		local filtered = filter_chat_messages(event.messages)
@@ -49,7 +30,6 @@ local function setup_conversation_manager_events()
 end
 
 function ChatWindowControl.setup()
-	setup_keymaps()
 	setup_conversation_manager_events()
 end
 

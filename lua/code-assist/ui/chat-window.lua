@@ -7,6 +7,7 @@ local ChatWindow = {}
 --- @alias ChatKeymapFunction fun(win: integer, buf: integer)
 
 local EventDispatcher = require("code-assist.event-dispatcher")
+local ConversationManager = require("code-assist.conversation-manager")
 
 --- Setup the chat buffer or setup a new one if one exists already.
 --- @return integer buffer
@@ -75,6 +76,30 @@ local function redraw()
 		print_message(m)
 	end
 	vim.bo[chat_buf].modifiable = false
+end
+
+--- Create a new keymap for the chat window.
+--- @param key string
+--- @param func fun()
+local function add_keymap(key, func)
+	vim.keymap.set("n", key, function()
+		func()
+	end, { buffer = chat_buf })
+end
+
+local function setup_keymaps()
+	add_keymap("q", function()
+		ChatWindow.hide()
+	end)
+	add_keymap("<CR>", function()
+		vim.ui.input({ prompt = "You: " }, function(input)
+			if not input then
+				return
+			end
+			ConversationManager.append_message({ role = "user", content = input })
+			ConversationManager.generate_response()
+		end)
+	end)
 end
 
 --- Append a message to the chat window.
@@ -152,17 +177,8 @@ function ChatWindow.open(orientation)
 	vim.wo[win].wrap = true
 	vim.wo[win].linebreak = true
 	vim.api.nvim_win_set_buf(win, chat_buf)
-	redraw()
+	setup_keymaps()
 	ChatWindow.on_visibility_change:dispatch("show")
-end
-
---- Create a new keymap for the chat window.
---- @param key string
---- @param func fun()
-function ChatWindow.add_keymap(key, func)
-	vim.keymap.set("n", key, function()
-		func()
-	end, { buffer = chat_buf })
 end
 
 --- @type EventDispatcher<WindowDisplayEvent>
