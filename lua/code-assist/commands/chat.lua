@@ -32,8 +32,16 @@ ChatCommand.run = function(opts)
 		SelectWindow.set_chat_orientation(orientation)
 		SelectWindow.open()
 	elseif is_new then
-		ConversationManager.new_conversation()
-		ChatWindow.open(orientation)
+		vim.ui.input({ prompt = "New Chat:" }, function(input)
+			if not input then
+				return
+			end
+			if input == "" then
+				input = nil
+			end
+			ConversationManager.new_conversation(input)
+			ChatWindow.open(orientation)
+		end)
 	else
 		ConversationManager.load_last_or_create_new()
 		ChatWindow.open(orientation)

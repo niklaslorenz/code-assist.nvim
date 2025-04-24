@@ -11,12 +11,13 @@ A plugin to interact with the openai API for Neovim
 - [ ] (Refatoring) Move keymaps from chat-window-control into chat-window
 - [ ] Chat Window Title
 - [ ] Multi Line Inputs
-- [ ] Keymaps
+- [i] Keymaps
   - [ ] help (?) for every window
-  - [ ] Rename conversation from chat window
-  - [ ] Delete conversation from chat window
+  - [x] Rename conversation from chat window
+  - [x] Delete conversation from chat window
   - [ ] Select conversation from chat window
   - [ ] Change chat window size in split mode
+  - [ ] Change delete keymap as it is already used by the delete feature -> leads to delay
 - [ ] Project Conversations
 - [ ] Plugin opts
   - [ ] model
@@ -26,6 +27,19 @@ A plugin to interact with the openai API for Neovim
   - [ ] opts for code-block types
 - [ ] Adjustable filter for messages
   - [ ] Move filtering into chat window
+- [ ] Add Conversation manager event for name change of current conversation
+  - [ ] Update window title accordingly
+- [ ] Conversation "Snippets":
+  - Unnamed and unstructured conversations
+  - Indexed by topics
+  - Searchable via vector_stores
+  - Link to each other
+  - Whenever a new snippet is created, the context is automatically updated with content
+    from snippets with similar topics
+
+## BUGS
+
+- When renaming a convesation, last_conversation is not updated resulting in a new conversation being created when opened again after restart
 
 ## Setup
 

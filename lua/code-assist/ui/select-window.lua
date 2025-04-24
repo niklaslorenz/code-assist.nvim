@@ -52,14 +52,12 @@ end
 local function delete_hovered()
 	local name = get_hovered()
 	vim.ui.input({ prompt = "Delete " .. name .. "?" }, function(input)
-		if not input then
+		if not input or input ~= "yes" then
 			return
 		end
-		if input == "yes" then
-			local success = ConversationManager.delete_conversation(name)
-			if not success then
-				vim.notify("Failed to delete conversation: " .. name, vim.log.levels.ERROR)
-			end
+		local success = ConversationManager.delete_conversation(name)
+		if not success then
+			vim.notify("Failed to delete conversation: " .. name, vim.log.levels.ERROR)
 		end
 		SelectWindow.refresh()
 	end)

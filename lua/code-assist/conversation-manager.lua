@@ -109,7 +109,12 @@ function ConversationManager.delete_conversation(name)
 	if fn.filereadable(fname) == 0 then
 		return false
 	end
-	return fn.delete(fname) == 0
+	local success = fn.delete(fname) == 0
+	if success and current_conversation and current_conversation.name == name then
+		current_conversation = nil
+		ConversationManager.on_conversation_update:dispatch({ operation = "switch", messages = {} })
+	end
+	return success
 end
 
 --- @return boolean success
@@ -122,7 +127,11 @@ function ConversationManager.rename_conversation(name, new_name)
 	if vim.fn.filereadable(new_fname) ~= 0 then
 		return false
 	end
-	return fn.rename(fname, new_fname) == 0
+	local success = fn.rename(fname, new_fname) == 0
+	if success and current_conversation and current_conversation.name == name then
+		current_conversation.name = new_name
+	end
+	return success
 end
 
 ---Save the current conversation to disk.
@@ -133,9 +142,9 @@ function ConversationManager.save_current_conversation()
 end
 
 ---Create a new conversation and notify subscribers.
-function ConversationManager.new_conversation()
-	local name = os.date("%Y-%m-%d_%H-%M-%S")
-	assert(type(name) == "string") -- needed for type checker
+---@param name string?
+function ConversationManager.new_conversation(name)
+	name = name or os.date("%Y-%m-%d_%H-%M-%S") --[[@as string]]
 	local messages = { { role = "system", content = initial_system_message } }
 	current_conversation = { name = name, messages = messages }
 	ConversationManager.save_current_conversation()

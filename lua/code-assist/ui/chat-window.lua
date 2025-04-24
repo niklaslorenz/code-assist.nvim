@@ -96,8 +96,39 @@ local function setup_keymaps()
 			if not input then
 				return
 			end
-			ConversationManager.append_message({ role = "user", content = input })
-			ConversationManager.generate_response()
+			local success, reason = ConversationManager.append_message({ role = "user", content = input })
+			if success then
+				ConversationManager.generate_response()
+			elseif reason then
+				vim.notify(reason, vim.log.levels.ERROR)
+			end
+		end)
+	end)
+	add_keymap("r", function()
+		local name = ConversationManager.get_current_conversation().name
+		vim.ui.input({ prompt = "Rename:", default = name }, function(input)
+			if not input then
+				return
+			end
+			ConversationManager.rename_conversation(name, input)
+		end)
+	end)
+	add_keymap("d", function()
+		local name = ConversationManager.get_current_conversation().name
+		vim.ui.input({ prompt = "Delete?" }, function(input)
+			if not input or input ~= "yes" then
+				return
+			end
+			ConversationManager.delete_conversation(name)
+			-- TODO: What to do after deleting the current conversation?
+		end)
+	end)
+	add_keymap("n", function()
+		vim.ui.input({ prompt = "New:" }, function(input)
+			if not input then
+				return
+			end
+			ConversationManager.new_conversation(input)
 		end)
 	end)
 end
