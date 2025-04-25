@@ -7,118 +7,162 @@ if not api_key then
 	vim.notify("OPENAI_API_KEY not set", vim.log.levels.ERROR)
 end
 
+--- @param name string
+--- @param expected_type string
+--- @param data any
+--- @return unknown|nil
+local function try_get_optional(name, expected_type, data)
+	local value = data[name]
+	if not value or value == vim.NIL then
+		return nil
+	end
+	if type(value) ~= expected_type then
+		error(
+			"Invalid property type for property "
+			.. name
+			.. ": Expected "
+			.. expected_type
+			.. " but got "
+			.. type(value)
+		)
+	end
+	return value
+end
+
+--- @param name string
+--- @param expected_type string
+--- @param data any
+--- @return unknown
+local function try_get(name, expected_type, data)
+	local value = try_get_optional(name, expected_type, data)
+	if not value then
+		error("Invalid nil value for property: " .. name)
+	end
+	return value
+end
+
+--- @param name string
+--- @param expected_type string
+--- @param data any
+--- @return number
+local function try_get_number(name, expected_type, data)
+	local value = try_get(name, "number", data)
+	local actual_type = math.floor(value) == value and "integer" or "float"
+	if actual_type ~= expected_type then
+		error(
+			"Invalid number type for property " .. name .. ": Expected " .. expected_type .. " but got " .. actual_type
+		)
+	end
+	return value
+end
+
+--- @return ChatCompletionChunk
+local function extract_chunk_from_json(data)
+	local choices_data = try_get_optional("choices", "table", data)
+	--- @type ChatCompletionChunkChoice[]
+	local choices = {}
+
+	if choices_data then
+		for _, cd in ipairs(choices_data) do
+			local delta_data = try_get("delta", "table", cd)
+			local tool_calls_data = try_get_optional("tool_calls", "table", delta_data)
+			--- @type ChatCompletionChunkToolCall[]
+			local tool_calls = {}
+			if tool_calls_data then
+				for _, td in ipairs(tool_calls_data) do
+					--- @type ChatCompletionChunkToolCall
+					local tool_call = {
+						arguments = try_get("arguments", "string", td),
+						id = try_get("id", "string", td),
+						index = try_get_number("index", "integer", td),
+						name = try_get("name", "string", td),
+					}
+					table.insert(tool_calls, tool_call)
+				end
+			end
+
+			--- @type ChatCompletionChunkDelta
+			local delta = {
+				role = try_get_optional("role", "string", delta_data),
+				content = try_get_optional("content", "string", delta_data),
+				tool_calls = tool_calls,
+				refusal = try_get_optional("refusal", "string", delta_data),
+			}
+			--- @type ChatCompletionChunkChoice
+			local choice = {
+				index = try_get_number("index", "integer", cd),
+				delta = delta,
+				finish_reason = try_get_optional("finish_reason", "string", cd),
+			}
+			table.insert(choices, choice)
+		end
+	end
+
+	--- @type ChatCompletionChunk
+	local chunk = {
+		choices = choices,
+		created = try_get_number("created", "integer", data),
+		id = try_get("id", "string", data),
+		model = try_get("model", "string", data),
+		system_fingerprint = try_get("system_fingerprint", "string", data),
+	}
+	return chunk
+end
+
+--- @param data string[] An array of data lines
+--- @param buffer string? The previous incomplete data line
+--- @return ChatCompletionChunk[] chunks, string? buffer, boolean finished
+function Streaming.decode_chat_completion_chunks(data, buffer)
+	--- @type ChatCompletionChunk[]
+	local chunks = {}
+
+	for i, line in ipairs(data) do
+		if line and line ~= "" then
+			local slice = nil
+			if buffer then
+				slice = buffer .. line
+				buffer = nil
+			elseif line:match("^data: ") then
+				slice = line:sub(7)
+			else
+				error("Error decoding response data: Wrong prefix.")
+			end
+			if slice == "[DONE]" then
+				return chunks, nil, true
+			end
+			local ok, decoded = pcall(vim.fn.json_decode, slice)
+			if ok then
+				local chunk = extract_chunk_from_json(decoded)
+				table.insert(chunks, chunk)
+			else
+				buffer = slice
+			end
+		end
+	end
+	return chunks, buffer, false
+end
+
+--- @param status ChatCompletionResponseStatus
+--- @param new_chunks ChatCompletionChunk[]
+local function handleStreamingTestMessage(status, new_chunks)
+	--- @type string[]
+	local messages = {}
+	for _, chunk in ipairs(new_chunks) do
+		--- @type ChatCompletionChunkChoice
+		local choice = chunk.choices[1]
+		local message = choice.delta.content
+		-- TODO: Add other message content like role
+		table.insert(messages, message)
+	end
+	print(table.concat(messages))
+end
 function Streaming.test()
 	--- @type Message[]
 	local messages = {
 		{ role = "system", content = "You are a helpful AI assistant." },
 		{ role = "user",   content = "Hello, who are you?" },
 	}
-	Streaming.post_request(messages)
-end
-
---- @param data string[]
---- @param buffer string?
-local function decode(data, buffer)
-	local chunks = {}
-
-	for _, line in ipairs(data) do
-		local slice = nil
-		if buffer then
-			slice = buffer .. line
-		else
-			if line:match("^data: ") then
-				slice = line:sub(6)
-			else
-				error("Error decoding response data: Wrong prefix.")
-			end
-		end
-		if slice then
-			if slice == "[DONE]" then
-				return chunks
-			end
-		end
-	end
-	warn("Missing response sentinel.")
-end
---- @param rawData string[]
-local function decodeChunks(rawData)
-	local chunks = {} -- Table to accumulate completed chunks
-	local buffer = "" -- Buffer to hold incomplete lines or data
-
-	for _, line in ipairs(rawData) do
-		-- Ensure that we are processing lines correctly
-		if line:match("^data: ") then
-			local json_data = line:sub(7) -- Remove 'data: ' prefix
-
-			if json_data and json_data ~= "[DONE]" then
-				buffer = buffer .. json_data -- Accumulate data
-
-				-- Check if the buffered data can be decoded
-				local success, result = pcall(function()
-					return require("cjson").decode(buffer)
-				end)
-
-				if success and result.choices and result.choices[1].delta.content then
-					-- Successfully decoded a JSON chunk
-					table.insert(chunks, result.choices[1].delta.content) -- Add content to chunks
-					buffer = ""                                      -- Clear buffer after processing
-				end
-			end
-		end
-
-		-- If an incoming line does not match 'data: ', it may be an error message or other information
-		if line and not line:match("^data: ") then
-			print("Unexpected line: " .. line) -- Print unexpected lines for debugging
-		end
-	end
-
-	return chunks
-end
-
--- Example of usage in the callback
-local function handleOutput(data)
-	local chunks = decodeChunks(data) -- Decode using the function
-
-	for _, chunk in ipairs(chunks) do
-		print(chunk) -- Output the chunks as they are decoded
-	end
-end
-
---- @param messages Message[]
-function Streaming.post_request(messages)
-	local fname = data_path .. "/test.json"
-	if vim.fn.filereadable(fname) ~= 0 then
-		vim.fn.delete(fname)
-	end
-	local payload = vim.fn.json_encode({
-		model = "gpt-4o-mini",
-		messages = messages,
-		stream = true,
-	})
-	local iterator = 0
-	vim.fn.jobstart({
-		"curl",
-		"-s",
-		"https://api.openai.com/v1/chat/completions",
-		"-H",
-		"Content-Type: application/json",
-		"-H",
-		"Authorization: Bearer " .. api_key,
-		"-d",
-		payload,
-	}, {
-		stdout_buffered = false,
-		on_stdout = function(_, data)
-			vim.fn.writefile({ "--- chunk " .. iterator .. " ---" }, fname, "a")
-			iterator = iterator + 1
-			vim.fn.writefile(data, fname, "a")
-			local resp = table.concat(data, "")
-			local ok, decoded = pcall(vim.fn.json_decode, resp)
-			if ok and decoded and decoded.choices and decoded.choices[1] then
-				local reply = decoded.choices[1].message.content
-			end
-		end,
-	})
+	local test_result = Streaming.post_request(messages, handleStreamingTestMessage)
 end
 
 return Streaming
