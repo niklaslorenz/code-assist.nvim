@@ -1,11 +1,5 @@
 local ChatWindow = {}
 
---- @alias WindowOrientation "hsplit"|"vsplit"|"float"
-
---- @alias WindowDisplayEvent "show"|"hide"
-
---- @alias ChatKeymapFunction fun(win: integer, buf: integer)
-
 local EventDispatcher = require("code-assist.event-dispatcher")
 local ConversationManager = require("code-assist.conversation-manager")
 
@@ -32,6 +26,9 @@ local chat_win = nil
 --- @type Message[]
 local messages = {}
 
+--- @type WindowOrientation
+local last_orientation = "float"
+
 --- Highlighting namespace
 local ns = vim.api.nvim_create_namespace("code-assist")
 
@@ -44,7 +41,7 @@ local function get_win()
 	return nil
 end
 
---- Print a message to the buffer
+--- Print a message to the buffer.
 --- @param message Message
 local function print_message(message)
 	local header = (message.role == "user" and "You:" or "Assistant:")
@@ -57,6 +54,26 @@ local function print_message(message)
 		table.insert(body_lines, "  " .. ln)
 	end
 	vim.api.nvim_buf_set_lines(chat_buf, line_count + 1, line_count + 1, false, body_lines)
+end
+
+--- Print the extension of the last message to the buffer.
+--- @param delta string
+local function print_message_extension(delta)
+	local followup_lines = {}
+	local base_line
+	for i, ln in ipairs(vim.split(delta, "\n")) do
+		if i ~= 1 then
+			table.insert(followup_lines, " " .. ln)
+		else
+			base_line = ln
+		end
+	end
+	local line_count = vim.api.nvim_buf_line_count(chat_buf)
+	local last_line = vim.api.nvim_buf_get_lines(chat_buf, line_count - 1, line_count, true)[1]
+	vim.api.nvim_buf_set_lines(chat_buf, line_count - 1, line_count, true, { last_line .. base_line })
+	if #followup_lines ~= 0 then
+		vim.api.nvim_buf_set_lines(chat_buf, line_count, line_count + 1, false, followup_lines)
+	end
 end
 
 --- Clear the chat display (not the messages held by the window).
@@ -96,15 +113,20 @@ local function setup_keymaps()
 			if not input then
 				return
 			end
-			local success, reason = ConversationManager.append_message({ role = "user", content = input })
+			if not ConversationManager.is_ready() then
+				vim.notify("Conversation Manager not ready.")
+				print(ConversationManager.get_status())
+				return
+			end
+			local success, reason = ConversationManager.add_message({ role = "user", content = input })
 			if success then
-				ConversationManager.generate_response()
+				ConversationManager.generate_streaming_response()
 			elseif reason then
 				vim.notify(reason, vim.log.levels.ERROR)
 			end
 		end)
 	end)
-	add_keymap("r", function()
+	add_keymap("<leader>ar", function()
 		local name = ConversationManager.get_current_conversation().name
 		vim.ui.input({ prompt = "Rename:", default = name }, function(input)
 			if not input then
@@ -113,7 +135,7 @@ local function setup_keymaps()
 			ConversationManager.rename_conversation(name, input)
 		end)
 	end)
-	add_keymap("d", function()
+	add_keymap("<leader>adc", function()
 		local name = ConversationManager.get_current_conversation().name
 		vim.ui.input({ prompt = "Delete?" }, function(input)
 			if not input or input ~= "yes" then
@@ -123,13 +145,19 @@ local function setup_keymaps()
 			-- TODO: What to do after deleting the current conversation?
 		end)
 	end)
-	add_keymap("n", function()
+	add_keymap("<leader>an", function()
 		vim.ui.input({ prompt = "New:" }, function(input)
 			if not input then
 				return
 			end
 			ConversationManager.new_conversation(input)
 		end)
+	end)
+	add_keymap("<leader>adm", function()
+		ConversationManager.delete_last_message()
+	end)
+	add_keymap("<leader>ag", function()
+		ConversationManager.generate_streaming_response()
 	end)
 end
 
@@ -139,6 +167,19 @@ function ChatWindow.append_message(message)
 	table.insert(messages, message)
 	vim.bo[chat_buf].modifiable = true
 	print_message(message)
+	vim.bo[chat_buf].modifiable = false
+	ChatWindow.scroll_to_bottom()
+end
+
+--- Extend the last message of the window.
+--- @param delta string
+function ChatWindow.extend_last_message(delta)
+	local last_msg = messages[#messages]
+	if not last_msg then
+		error("No message to extend.")
+	end
+	vim.bo[chat_buf].modifiable = true
+	print_message_extension(delta)
 	vim.bo[chat_buf].modifiable = false
 	ChatWindow.scroll_to_bottom()
 end
@@ -173,15 +214,21 @@ function ChatWindow.hide()
 end
 
 --- Show the chat window.
---- @param orientation WindowOrientation
+--- @param orientation WindowOrientation?
 function ChatWindow.open(orientation)
 	-- If already open, jump there
 	local win = get_win()
 	if win then
-		vim.api.nvim_set_current_win(win)
-		return
+		if last_orientation == orientation then
+			vim.api.nvim_set_current_win(win)
+			return
+		end
+		ChatWindow.hide()
 	end
 	-- Create the window
+	if not orientation then
+		orientation = last_orientation
+	end
 	if orientation == "hsplit" then
 		vim.cmd("split")
 		win = vim.api.nvim_get_current_win()
@@ -204,6 +251,7 @@ function ChatWindow.open(orientation)
 			border = "rounded",
 		})
 	end
+	last_orientation = orientation
 	chat_win = win
 	vim.wo[win].wrap = true
 	vim.wo[win].linebreak = true

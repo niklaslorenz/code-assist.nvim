@@ -2,6 +2,26 @@
 local ConversationManager = require("code-assist.conversation-manager")
 local ChatWindowControl = require("code-assist.control.chat-window-control")
 local ChatCommand = require("code-assist.commands.chat")
+local ChatWindow = require("code-assist.ui.chat-window")
+
+--- @param mode string|string[]
+--- @param key string
+--- @param callback fun()
+local function add_keymap(mode, key, callback)
+	vim.keymap.set(mode, key, callback, { noremap = true, silent = true })
+end
+
+local function define_global_keymaps()
+	add_keymap("n", "<leader>an", ChatCommand.create_new_conversation)
+	add_keymap("n", "<leader>as", ChatCommand.select_conversation)
+	add_keymap("n", "<leader>av", ChatCommand.open_vertical_split)
+	add_keymap("n", "<leader>ah", ChatCommand.open_horizontal_split)
+	add_keymap("n", "<leader>af", ChatCommand.open_float)
+	add_keymap("n", "<leader>ao", ChatCommand.open)
+	add_keymap("n", "<leader>am", ChatCommand.prompt_message)
+	add_keymap("v", "<leader>ac", ChatCommand.copy_selection)
+	add_keymap("v", "<leader>am", ChatCommand.prompt_selection_message)
+end
 
 local function setup()
 	vim.api.nvim_set_hl(0, "ChatUser", { fg = "#a3be8c", bold = true })
@@ -10,20 +30,15 @@ local function setup()
 	ConversationManager.setup()
 	ChatWindowControl.setup()
 	ChatCommand.setup()
-end
+	define_global_keymaps()
 
-local function define_chat_command_keymaps()
-	local opts = { noremap = true, silent = true }
-	vim.keymap.set("n", "<leader>af", "<cmd>Chat f<CR>", opts)
-	vim.keymap.set("n", "<leader>ah", "<cmd>Chat h<CR>", opts)
-	vim.keymap.set("n", "<leader>av", "<cmd>Chat v<CR>", opts)
-	vim.keymap.set("n", "<leader>anf", "<cmd>Chat n f<CR>", opts)
-	vim.keymap.set("n", "<leader>anh", "<cmd>Chat n h<CR>", opts)
-	vim.keymap.set("n", "<leader>anv", "<cmd>Chat n v<CR>", opts)
-	vim.keymap.set("n", "<leader>asf", "<cmd>Chat s f<CR>", opts)
-	vim.keymap.set("n", "<leader>ash", "<cmd>Chat s h<CR>", opts)
-	vim.keymap.set("n", "<leader>asv", "<cmd>Chat s v<CR>", opts)
+	ChatWindow.on_visibility_change:subscribe(function(event)
+		if event == "show" then
+			if not ConversationManager.has_conversation() then
+				ConversationManager.load_last_or_create_new()
+			end
+		end
+	end)
 end
 
 setup()
-define_chat_command_keymaps()

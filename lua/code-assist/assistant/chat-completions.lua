@@ -1,34 +1,6 @@
 local ChatCompletions = {}
 
-local Streaming = require("code-assist.assistant.interface.streaming")
-
---- @class ChatCompletionResponseStatus
---- @field complete boolean
---- @field chunks ChatCompletionChunk[]
-
---- @class ChatCompletionChunkToolCall
---- @field index integer
---- @field id string
---- @field name string
---- @field arguments string
-
---- @class ChatCompletionChunkDelta
---- @field content string?
---- @field refusal string?
---- @field role string?
---- @field tool_calls ChatCompletionChunkToolCall[]
-
---- @class ChatCompletionChunkChoice
---- @field index integer
---- @field finish_reason string?
---- @field delta ChatCompletionChunkDelta
-
---- @class ChatCompletionChunk
---- @field id string
---- @field choices ChatCompletionChunkChoice[]
---- @field created integer
---- @field model string
---- @field system_fingerprint string
+local ChatCompletionDecoder = require("code-assist.assistant.interface.chat-completion-decoder")
 
 local api_key = os.getenv("OPENAI_API_KEY")
 if not api_key then
@@ -40,11 +12,17 @@ end
 --- @param model string
 --- @param messages Message[]
 --- @param callback fun(reply: Message)
+--- @return ChatCompletionResponseStatus status
 ChatCompletions.post_request = function(model, messages, callback)
 	local payload = vim.fn.json_encode({
 		model = model,
 		messages = messages,
 	})
+	--- @type ChatCompletionResponseStatus
+	local status = {
+		complete = false,
+		streamed = false,
+	}
 	vim.fn.jobstart({
 		"curl",
 		"-s",
@@ -58,21 +36,29 @@ ChatCompletions.post_request = function(model, messages, callback)
 	}, {
 		stdout_buffered = true,
 		on_stdout = function(_, data)
-			local resp = table.concat(data, "")
-			local ok, decoded = pcall(vim.fn.json_decode, resp)
-			if ok and decoded and decoded.choices and decoded.choices[1] then
-				local reply = decoded.choices[1].message.content
-				callback({ role = "assistant", content = reply })
+			local decode_ok, message = pcall(ChatCompletionDecoder.decode_chat_completion, data)
+			if decode_ok then
+				status.message = message
+				local callback_ok, error_msg = pcall(callback, message)
+				if not callback_ok then
+					print("Error in post_request callback: ")
+					print(error_msg)
+				end
+			else
+				print("Error in decoding chat completion: ")
+				print(message)
 			end
+			status.complete = true
 		end,
 	})
+	return status
 end
 
 --- @param model string
 --- @param messages Message[]
 --- @param on_chunks_ready fun(status: ChatCompletionResponseStatus, new_chunks: ChatCompletionChunk[])
 --- @param on_finish? fun(status: ChatCompletionResponseStatus)
---- @return ChatCompletionResponseStatus
+--- @return ChatCompletionResponseStatus status
 function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready, on_finish)
 	local payload = vim.fn.json_encode({
 		model = model,
@@ -84,6 +70,7 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 	--- @type ChatCompletionResponseStatus
 	local status = {
 		chunks = {},
+		streamed = true,
 		complete = false,
 	}
 
@@ -103,16 +90,36 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 			if status.complete then
 				return
 			end
-			local new_chunks, new_buffer, new_complete = Streaming.decode(data, buffer)
-			for _, chunk in ipairs(new_chunks) do
-				table.insert(status.chunks, chunk)
+			local decode_ok, new_chunks_or_error_msg, new_buffer, new_complete =
+					pcall(ChatCompletionDecoder.decode_chat_completion_chunks, data, buffer)
+			if decode_ok then
+				local new_chunks = new_chunks_or_error_msg
+				for _, chunk in ipairs(new_chunks) do
+					table.insert(status.chunks, chunk)
+				end
+				status.complete = new_complete
+				buffer = new_buffer
+				local callback_ok, callback_error_msg = pcall(on_chunks_ready, status, new_chunks)
+				if not callback_ok then
+					print("Error in post_streaming_request chunk callback:")
+					print(callback_error_msg)
+				end
+			else
+				local error_msg = new_chunks_or_error_msg
+				print("Error in decoding chat completion chunks:")
+				print(error_msg)
 			end
-			status.complete = new_complete
-			buffer = new_buffer
-			on_chunks_ready(status, new_chunks)
 			if status.complete and on_finish then
-				on_finish(status)
+				status.complete = true
+				local finish_callback_ok, error_msg = pcall(on_finish, status)
+				if not finish_callback_ok then
+					print("Error in post_streaming_request finish callback:")
+					print(error_msg)
+				end
 			end
+		end,
+		on_finish = function(_)
+			status.complete = true
 		end,
 	})
 	return status

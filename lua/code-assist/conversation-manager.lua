@@ -22,17 +22,29 @@ local initial_system_message = "You are a helpful programming assistant."
 ---@field role Role
 ---@field content string
 
+--- @class MessageDelta
+--- @field content string
+
 ---@class Conversation
 ---@field name string
 ---@field messages Message[]
 
----@class ConversationUpdateEvent
----@field operation "append"|"switch"
----@field messages Message[]
+--- @class ConversationSwitchEvent
+--- @field new_messages Message[]
+--- @field name string
 
--- Current conversation state (nil if none yet)
----@type Conversation|nil
+--- @class NewMessageEvent
+--- @field new_message Message
+
+--- @class MessageExtendEvent
+--- @field delta string
+
+--- Current conversation state (nil if none yet)
+--- @type Conversation|nil
 local current_conversation = nil
+
+--- @type ChatCompletionResponseStatus | nil
+local current_response = nil
 
 ---Ensure that a directory exists.
 ---@param path string
@@ -72,6 +84,7 @@ end
 ---@param name string
 ---@return boolean success
 function ConversationManager.load_conversation(name)
+	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
 	if fn.filereadable(fname) ~= 0 then
 		local content = fn.readfile(fname)
@@ -79,9 +92,9 @@ function ConversationManager.load_conversation(name)
 		if ok and data.messages then
 			current_conversation = { name = name, messages = data.messages }
 			save_last(name)
-			ConversationManager.on_conversation_update:dispatch({
-				operation = "switch",
-				messages = current_conversation.messages,
+			ConversationManager.on_conversation_switch:dispatch({
+				name = current_conversation.name,
+				new_messages = current_conversation.messages,
 			})
 			return true
 		end
@@ -92,6 +105,7 @@ end
 ---Load the last conversation (if exists).
 ---@return boolean success
 function ConversationManager.load_last_conversation()
+	assert(ConversationManager.is_ready())
 	if fn.filereadable(last_conv_file) ~= 0 then
 		local lines = fn.readfile(last_conv_file)
 		local name = lines[1]
@@ -105,6 +119,7 @@ end
 
 --- @return boolean success
 function ConversationManager.delete_conversation(name)
+	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
 	if fn.filereadable(fname) == 0 then
 		return false
@@ -112,13 +127,14 @@ function ConversationManager.delete_conversation(name)
 	local success = fn.delete(fname) == 0
 	if success and current_conversation and current_conversation.name == name then
 		current_conversation = nil
-		ConversationManager.on_conversation_update:dispatch({ operation = "switch", messages = {} })
+		ConversationManager.on_conversation_switch:dispatch({ name = name, new_messages = {} })
 	end
 	return success
 end
 
 --- @return boolean success
 function ConversationManager.rename_conversation(name, new_name)
+	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
 	if fn.filereadable(fname) == 0 then
 		return false
@@ -144,14 +160,15 @@ end
 ---Create a new conversation and notify subscribers.
 ---@param name string?
 function ConversationManager.new_conversation(name)
+	assert(ConversationManager.is_ready())
 	name = name or os.date("%Y-%m-%d_%H-%M-%S") --[[@as string]]
 	local messages = { { role = "system", content = initial_system_message } }
 	current_conversation = { name = name, messages = messages }
 	ConversationManager.save_current_conversation()
 	save_last(name)
-	ConversationManager.on_conversation_update:dispatch({
-		operation = "switch",
-		messages = current_conversation.messages,
+	ConversationManager.on_conversation_switch:dispatch({
+		name = name,
+		new_messages = current_conversation.messages,
 	})
 end
 
@@ -169,7 +186,7 @@ end
 ---@param message Message
 ---@param name string? Optional conversation name to verify
 ---@return boolean success, string? reason
-function ConversationManager.append_message(message, name)
+function ConversationManager.add_message(message, name)
 	if not current_conversation then
 		return false, "no current conversation"
 	end
@@ -178,30 +195,142 @@ function ConversationManager.append_message(message, name)
 	end
 	table.insert(current_conversation.messages, message)
 	ConversationManager.save_current_conversation()
-	ConversationManager.on_conversation_update:dispatch({ operation = "append", messages = { message } })
+	ConversationManager.on_new_message:dispatch({ new_message = message })
 	return true
 end
 
----Get the current conversation.
----@return Conversation|nil
+--- Extend the last message of the current conversation.
+--- @param msg_delta string
+function ConversationManager.extend_last_message(msg_delta, conversation_name)
+	if not current_conversation then
+		return false, "no current conversation"
+	end
+	if conversation_name and current_conversation.name ~= conversation_name then
+		return false, "conversation mismatch"
+	end
+	local last_msg = current_conversation.messages[#current_conversation.messages]
+	if not last_msg then
+		return false, "no chat messages"
+	end
+	if last_msg.role == "system" then
+		return false, "cannot extend system messages"
+	end
+	last_msg.content = last_msg.content .. msg_delta
+	ConversationManager.on_message_extend:dispatch({
+		delta = msg_delta,
+	})
+end
+
+--- Delete the last message of the current conversation.
+--- # Preconditions:
+--- - `ConversationManager.is_ready()`
+--- - `ConversationManager.current_conversation ~= nil`
+function ConversationManager.delete_last_message()
+	assert(current_conversation)
+	assert(ConversationManager.is_ready())
+	local message_count = #current_conversation.messages
+	if message_count == 0 then
+		return
+	end
+	table.remove(current_conversation.messages, message_count)
+	ConversationManager.on_conversation_switch:dispatch({
+		name = current_conversation.name,
+		new_messages = current_conversation.messages,
+	})
+end
+
+--- Get the current conversation.
+--- @nodiscard
+--- @return Conversation|nil
 function ConversationManager.get_current_conversation()
 	return current_conversation
+end
+
+--- Get the current response status.
+--- @nodiscard
+--- @return ChatCompletionResponseStatus | nil
+function ConversationManager.get_status()
+	return current_response
+end
+
+--- @nodiscard
+function ConversationManager.has_conversation()
+	return current_conversation ~= nil
+end
+
+--- Determine if the conversation manager is ready to generate a new response.
+--- @nodiscard
+--- @return boolean ready
+function ConversationManager.is_ready()
+	if not current_response then
+		return true
+	end
+	if not current_response.complete then
+		print("not ready. Status")
+		print(current_response)
+		return false
+	end
+	return true
 end
 
 --- Generate a response for the current conversation.
 function ConversationManager.generate_response()
 	assert(current_conversation)
-	local conversation_name = current_conversation.name
-	ChatCompletions.create_response(model, current_conversation.messages, function(response)
-		if response then
-			ConversationManager.append_message(response, conversation_name)
-		else
-			ConversationManager.append_message({ role = "assistant", content = "[Error fetching response]" })
-		end
+	assert(ConversationManager.is_ready())
+	local response_status = ChatCompletions.post_request(model, current_conversation.messages, function(message)
+		ConversationManager.add_message(message)
 	end)
+	current_response = response_status
 end
 
---- @type EventDispatcher<ConversationUpdateEvent>
-ConversationManager.on_conversation_update = EventDispatcher.new()
+--- Generate a response and stream the result to the current conversation.
+function ConversationManager.generate_streaming_response()
+	assert(current_conversation)
+	assert(ConversationManager.is_ready())
+	local response_status = ChatCompletions.post_streaming_request(
+		model,
+		current_conversation.messages,
+		function(_, chunks)
+			local current_delta_msg = nil
+			for _, chunk in pairs(chunks) do
+				if chunk.choices[1] then
+					local delta = chunk.choices[1].delta
+					if not delta.role then
+						if delta.content then
+							if current_delta_msg then
+								current_delta_msg = current_delta_msg .. delta.content
+							else
+								current_delta_msg = delta.content
+							end
+						end
+					else
+						if current_delta_msg then
+							ConversationManager.extend_last_message(current_delta_msg)
+							current_delta_msg = nil
+						end
+						ConversationManager.add_message({
+							role = delta.role,
+							content = delta.content or "",
+						})
+					end
+				end
+			end
+			if current_delta_msg then
+				ConversationManager.extend_last_message(current_delta_msg)
+			end
+		end,
+		function(_)
+			ConversationManager.save_current_conversation()
+		end
+	)
+	current_response = response_status
+end
+
+--- @type EventDispatcher<MessageExtendEvent>
+ConversationManager.on_message_extend = EventDispatcher.new()
+--- @type EventDispatcher<NewMessageEvent>
+ConversationManager.on_new_message = EventDispatcher.new()
+--- @type EventDispatcher<ConversationSwitchEvent>
+ConversationManager.on_conversation_switch = EventDispatcher.new()
 
 return ConversationManager

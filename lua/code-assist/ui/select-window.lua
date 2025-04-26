@@ -12,9 +12,6 @@ local select_buf = nil
 --- @type string[]
 local conv_list = {}
 
---- @type WindowOrientation
-local chat_orientation = "float"
-
 local function get_win()
 	if select_win and vim.api.nvim_win_is_valid(select_win) then
 		return select_win
@@ -43,7 +40,7 @@ local function select_hovered()
 	local success = ConversationManager.load_conversation(name)
 	if success then
 		SelectWindow.close()
-		ChatWindow.open(chat_orientation)
+		ChatWindow.open()
 	else
 		vim.notify("Failed to load conversation: " .. name, vim.log.levels.ERROR)
 	end
@@ -101,11 +98,6 @@ local function setup_keymaps()
 		rename_hovered()
 	end, { buffer = buf })
 	return true
-end
-
---- @param orientation WindowOrientation
-function SelectWindow.set_chat_orientation(orientation)
-	chat_orientation = orientation
 end
 
 function SelectWindow.close()

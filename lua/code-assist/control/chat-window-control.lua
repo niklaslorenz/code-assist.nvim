@@ -17,15 +17,17 @@ local function filter_chat_messages(messages)
 end
 
 local function setup_conversation_manager_events()
-	ConversationManager.on_conversation_update:subscribe(function(event)
-		local filtered = filter_chat_messages(event.messages)
-		if event.operation == "append" then
-			for _, m in ipairs(filtered) do
-				ChatWindow.append_message(m)
-			end
-		else
-			ChatWindow.replace_messages(filtered)
+	ConversationManager.on_conversation_switch:subscribe(function(event)
+		local filtered = filter_chat_messages(event.new_messages)
+		ChatWindow.replace_messages(filtered)
+	end)
+	ConversationManager.on_new_message:subscribe(function(event)
+		if event.new_message.role ~= "system" then
+			ChatWindow.append_message(event.new_message)
 		end
+	end)
+	ConversationManager.on_message_extend:subscribe(function(event)
+		ChatWindow.extend_last_message(event.delta)
 	end)
 end
 

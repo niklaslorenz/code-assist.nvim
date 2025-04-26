@@ -4,6 +4,9 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
+- [ ] implement remaining keymap commands in commands.chat
+- [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
+  - [ ] needs message tracking
 - [ ] implement a chat completions request object
   - [ ] put the streaming request into chat-completions and keep the interface.streaming.lua file
         for processing logic only
@@ -19,6 +22,7 @@ A plugin to interact with the openai API for Neovim
 - [ ] Multi Line Inputs
 - [o] Keymaps
   - [ ] Previous and next message start/end with \[c, \[C \]c \]C
+    - needs message tracking
   - [ ] help (?) for every window
   - [x] Rename conversation from chat window
   - [x] Delete conversation from chat window
