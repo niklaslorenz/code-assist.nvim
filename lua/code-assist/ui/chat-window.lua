@@ -41,6 +41,21 @@ local function get_win()
 	return nil
 end
 
+--- Determine whether auto scrolling is currently on.
+--- @nodiscard
+--- @return boolean auto_scroll
+local function auto_scroll()
+	local win = get_win()
+	if not win then
+		return false
+	end
+	local pos = vim.api.nvim_win_get_cursor(win)
+	if pos[1] >= vim.api.nvim_buf_line_count(chat_buf) then
+		return true
+	end
+	return false
+end
+
 --- Print a message to the buffer.
 --- @param message Message
 local function print_message(message)
@@ -165,10 +180,13 @@ end
 --- @param message Message
 function ChatWindow.append_message(message)
 	table.insert(messages, message)
+	local scroll = auto_scroll()
 	vim.bo[chat_buf].modifiable = true
 	print_message(message)
 	vim.bo[chat_buf].modifiable = false
-	ChatWindow.scroll_to_bottom()
+	if scroll then
+		ChatWindow.scroll_to_bottom()
+	end
 end
 
 --- Extend the last message of the window.
@@ -178,10 +196,13 @@ function ChatWindow.extend_last_message(delta)
 	if not last_msg then
 		error("No message to extend.")
 	end
+	local scroll = auto_scroll()
 	vim.bo[chat_buf].modifiable = true
 	print_message_extension(delta)
 	vim.bo[chat_buf].modifiable = false
-	ChatWindow.scroll_to_bottom()
+	if scroll then
+		ChatWindow.scroll_to_bottom()
+	end
 end
 
 --- Scroll the chat window to the bottom.

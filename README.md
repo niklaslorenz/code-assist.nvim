@@ -21,6 +21,7 @@ A plugin to interact with the openai API for Neovim
 - [ ] Chat Window Title
 - [ ] Multi Line Inputs
 - [o] Keymaps
+  - [x] leader + a + b -> scroll to bottom
   - [ ] Previous and next message start/end with \[c, \[C \]c \]C
     - needs message tracking
   - [ ] help (?) for every window

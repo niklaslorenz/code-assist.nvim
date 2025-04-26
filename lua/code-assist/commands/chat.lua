@@ -65,6 +65,10 @@ ChatCommand.prompt_selection_message = function()
 	vim.notify("Not implemented yes.", vim.log.levels.WARN)
 end
 
+ChatCommand.scroll_to_bottom = function()
+	ChatWindow.scroll_to_bottom()
+end
+
 ChatCommand.run = function(opts)
 	-- parse args
 	local args = {}

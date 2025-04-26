@@ -21,6 +21,7 @@ local function define_global_keymaps()
 	add_keymap("n", "<leader>am", ChatCommand.prompt_message)
 	add_keymap("v", "<leader>ac", ChatCommand.copy_selection)
 	add_keymap("v", "<leader>am", ChatCommand.prompt_selection_message)
+	add_keymap({ "n", "v" }, "<leader>ab", ChatCommand.scroll_to_bottom)
 end
 
 local function setup()
