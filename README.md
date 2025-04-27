@@ -4,23 +4,32 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
+- [ ] Define location for user issued requests to the conversation manager
+  - Handles global and window keymap actions
+  - Ensures preconditions
+  - Notifies user on error
+- [ ] Ensure compliance to the conversation manager preconditions
+  - [ ] Define all preconditions
+  - [ ] Define result scenarios
+  - [ ] Ensure proper handling of results
+- [ ] Conversation sorting in selection screen
+  - [ ] keymap with o-<sort order key>
+  - [ ] plugin opt for default sorting order
+- [ ] Dynamic message filters
+  - [ ] Plugin opt for default filter
 - [ ] implement remaining keymap commands in commands.chat
 - [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
   - [ ] needs message tracking
 - [x] implement a chat completions request object
   - [x] put the streaming request into chat-completions and keep the interface.streaming.lua file
         for processing logic only
-- [ ] switch chat command argument positions (especially for keymaps)
-  - allows opening or selecting without specifying the orientation again
-- [ ] Implement futures and async safe queues for keymaps and responses
-- [ ] Response Streaming
-- [ ] Move rest of chat window control into chat window:
-  - [ ] Conversation Manager event handling
-- [ ] Chat editing
-- [ ] (Refatoring) Move keymaps from chat-window-control into chat-window
+- [x] Response Streaming
+- [-] Chat editing
+  - Goals?
+- [ ] (Refatoring) Cleanup chat-window-control
 - [ ] Chat Window Title
 - [ ] Multi Line Inputs
-- [o] Keymaps
+- [-] Keymaps
   - [x] leader + a + b -> scroll to bottom
   - [ ] Previous and next message start/end with \[c, \[C \]c \]C
     - needs message tracking
@@ -31,17 +40,18 @@ A plugin to interact with the openai API for Neovim
   - [ ] Change chat window size in split mode
   - [ ] Change delete keymap as it is already used by the delete feature -> leads to delay
 - [ ] Project Conversations
-- [ ] Plugin opts
-  - [ ] model
-  - [ ] system message
-  - [ ] color
+- [x] Plugin opts
+  - [x] model
+  - [x] system message
+  - [x] color
 - [ ] In visual mode, relay content to chat
   - [ ] opts for code-block types
 - [ ] Adjustable filter for messages
   - [ ] Move filtering into chat window
+- [ ] Window Titles
 - [ ] Add Conversation manager event for name change of current conversation
   - [ ] Update window title accordingly
-- [ ] Conversation "Snippets":
+- [ ] Conversation "Snippets" (see [./conversations-roadmap.md](./conversations-roadmap.md)):
   - Unnamed and unstructured conversations
   - Indexed by topics
   - Searchable via vector_stores

@@ -1,4 +1,6 @@
--- Expose user commands and keymaps
+local M = {}
+
+local PluginOptions = require("code-assist.options")
 local ConversationManager = require("code-assist.conversation-manager")
 local ChatWindowControl = require("code-assist.control.chat-window-control")
 local ChatCommand = require("code-assist.commands.chat")
@@ -12,7 +14,8 @@ local function add_keymap(mode, key, callback)
 end
 
 local function define_global_keymaps()
-	add_keymap("n", "<leader>an", ChatCommand.create_new_conversation)
+	add_keymap("n", "<leader>aN", ChatCommand.create_new_listed_conversation)
+	add_keymap("n", "<leader>an", ChatCommand.create_new_unlisted_conversation)
 	add_keymap("n", "<leader>as", ChatCommand.select_conversation)
 	add_keymap("n", "<leader>av", ChatCommand.open_vertical_split)
 	add_keymap("n", "<leader>ah", ChatCommand.open_horizontal_split)
@@ -24,9 +27,17 @@ local function define_global_keymaps()
 	add_keymap({ "n", "v" }, "<leader>ab", ChatCommand.scroll_to_bottom)
 end
 
-local function setup()
-	vim.api.nvim_set_hl(0, "ChatUser", { fg = "#a3be8c", bold = true })
-	vim.api.nvim_set_hl(0, "ChatAssistant", { fg = "#88c0d0", bold = true })
+function M.setup(opts)
+	if opts then
+		for k, v in pairs(opts) do
+			if PluginOptions[k] then
+				PluginOptions[k] = v
+			end
+		end
+	end
+
+	vim.api.nvim_set_hl(0, "ChatUser", { fg = PluginOptions.user_chat_color, bold = true })
+	vim.api.nvim_set_hl(0, "ChatAssistant", { fg = PluginOptions.assistant_chat_color, bold = true })
 
 	ConversationManager.setup()
 	ChatWindowControl.setup()
@@ -42,4 +53,4 @@ local function setup()
 	end)
 end
 
-setup()
+return M

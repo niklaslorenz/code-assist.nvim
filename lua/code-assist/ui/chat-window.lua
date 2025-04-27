@@ -129,31 +129,74 @@ local function setup_keymaps()
 				return
 			end
 			if not ConversationManager.is_ready() then
-				vim.notify("Conversation Manager not ready.")
-				print(ConversationManager.get_status())
+				vim.notify("Conversation Manager is not ready")
 				return
 			end
 			local success, reason = ConversationManager.add_message({ role = "user", content = input })
 			if success then
 				ConversationManager.generate_streaming_response()
-			elseif reason then
-				vim.notify(reason, vim.log.levels.ERROR)
+			else
+				vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
 			end
 		end)
 	end)
+
 	add_keymap("<leader>ar", function()
-		local name = ConversationManager.get_current_conversation().name
-		vim.ui.input({ prompt = "Rename:", default = name }, function(input)
-			if not input then
-				return
-			end
-			ConversationManager.rename_conversation(name, input)
-		end)
+		local conversation = ConversationManager.get_current_conversation()
+		if not conversation then
+			vim.notify("No current conversation", vim.log.levels.ERROR)
+			return
+		end
+		local switch = {
+			["listed"] = function()
+				vim.ui.input({ prompt = "Rename:", default = conversation.name }, function(input)
+					if not input then
+						return
+					end
+					if not ConversationManager.is_ready() then
+						vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
+						return
+					end
+					local ok, msg = ConversationManager.rename_listed_conversation(conversation.name, input)
+					if not ok then
+						vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
+					end
+				end)
+			end,
+			["unlisted"] = function()
+				vim.ui.input({ prompt = "Rename:" }, function(input)
+					if not input then
+						return
+					end
+					if not ConversationManager.is_ready() then
+						vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
+						return
+					end
+					local ok, msg = ConversationManager.convert_current_conversation_to_listed(input)
+					if not ok then
+						vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
+					end
+				end)
+			end,
+			["project"] = function()
+				-- TODO: implement
+				vim.notify("Saving project conversations is not supported yet")
+			end,
+		}
+		local switch_default = function()
+			vim.notify("Invalid conversation type: " .. conversation.type, vim.log.levels.ERROR)
+		end;
+		(switch[conversation.type] or switch_default)()
 	end)
+
 	add_keymap("<leader>adc", function()
 		local name = ConversationManager.get_current_conversation().name
 		vim.ui.input({ prompt = "Delete?" }, function(input)
 			if not input or input ~= "yes" then
+				return
+			end
+			if not ConversationManager.is_ready() then
+				vim.notify("Conversation Manager is not ready")
 				return
 			end
 			ConversationManager.delete_conversation(name)
@@ -161,17 +204,36 @@ local function setup_keymaps()
 		end)
 	end)
 	add_keymap("<leader>an", function()
+		if not ConversationManager.is_ready() then
+			vim.notify("Conversation Manager is not ready")
+			return
+		end
+		ConversationManager.new_unlisted_conversation()
+	end)
+	add_keymap("<leader>aN", function()
 		vim.ui.input({ prompt = "New:" }, function(input)
 			if not input then
+				return
+			end
+			if not ConversationManager.is_ready() then
+				vim.notify("Conversation Manager is not ready")
 				return
 			end
 			ConversationManager.new_conversation(input)
 		end)
 	end)
 	add_keymap("<leader>adm", function()
+		if not ConversationManager.is_ready() then
+			vim.notify("Conversation Manager is not ready")
+			return
+		end
 		ConversationManager.delete_last_message()
 	end)
 	add_keymap("<leader>ag", function()
+		if not ConversationManager.is_ready() then
+			vim.notify("Conversation Manager is not ready")
+			return
+		end
 		ConversationManager.generate_streaming_response()
 	end)
 end

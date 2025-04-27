@@ -4,17 +4,30 @@ local SelectWindow = require("code-assist.ui.select-window")
 local ConversationManager = require("code-assist.conversation-manager")
 local ChatWindow = require("code-assist.ui.chat-window")
 
-ChatCommand.create_new_conversation = function()
+ChatCommand.create_new_listed_conversation = function()
 	vim.ui.input({ prompt = "New Chat:" }, function(input)
 		if not input then
+			return
+		end
+		if not ConversationManager.is_ready() then
+			vim.notify("Conversation Manager is not ready")
 			return
 		end
 		if input == "" then
 			input = nil
 		end
-		ConversationManager.new_conversation(input)
+		ConversationManager.new_listed_conversation(input)
 		ChatWindow.open()
 	end)
+end
+
+ChatCommand.create_new_unlisted_conversation = function()
+	if not ConversationManager.is_ready() then
+		vim.notify("Conversation Manager is not ready")
+		return
+	end
+	ConversationManager.new_unlisted_conversation()
+	ChatWindow.open()
 end
 
 ChatCommand.select_conversation = function()

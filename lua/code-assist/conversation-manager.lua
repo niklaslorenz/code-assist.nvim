@@ -2,36 +2,16 @@ local ConversationManager = {}
 
 local EventDispatcher = require("code-assist.event-dispatcher")
 local ChatCompletions = require("code-assist.assistant.chat-completions")
+local PluginOptions = require("code-assist.options")
 
-local fn = vim.fn
-local data_path = fn.stdpath("data") .. "/code-assist"
+local data_path = PluginOptions.data_path
 local conv_path = data_path .. "/conversations"
 local last_conv_file = data_path .. "/last_conv"
-
---- The model name to use for responses
---- @type string
-local model = "gpt-4o-mini"
-
---- The system message that new conversations are initialized with.
---- @type string
-local initial_system_message = "You are a helpful programming assistant."
-
----@alias Role "user"|"assistant"|"system"
-
----@class Message
----@field role Role
----@field content string
-
---- @class MessageDelta
---- @field content string
-
----@class Conversation
----@field name string
----@field messages Message[]
+local model = PluginOptions.model
+local initial_system_message = PluginOptions.system_message
 
 --- @class ConversationSwitchEvent
---- @field new_messages Message[]
---- @field name string
+--- @field conversation Conversation?
 
 --- @class NewMessageEvent
 --- @field new_message Message
@@ -49,15 +29,15 @@ local current_response = nil
 ---Ensure that a directory exists.
 ---@param path string
 local function ensure_dir(path)
-	if fn.isdirectory(path) == 0 then
-		fn.mkdir(path, "p")
+	if vim.fn.isdirectory(path) == 0 then
+		vim.fn.mkdir(path, "p")
 	end
 end
 
 ---Save the last conversation name to disk.
 ---@param name string
 local function save_last(name)
-	fn.writefile({ name }, last_conv_file)
+	vim.fn.writefile({ name }, last_conv_file)
 end
 
 ---Initialize manager and load last conversation if available.
@@ -69,7 +49,7 @@ end
 ---List all saved conversation names.
 ---@return string[]
 function ConversationManager.list_conversations()
-	local files = fn.readdir(conv_path)
+	local files = vim.fn.readdir(conv_path)
 	local convs = {}
 	for _, file in ipairs(files) do
 		if file:match("%.json$") then
@@ -86,15 +66,14 @@ end
 function ConversationManager.load_conversation(name)
 	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
-	if fn.filereadable(fname) ~= 0 then
-		local content = fn.readfile(fname)
-		local ok, data = pcall(fn.json_decode, table.concat(content, "\n"))
+	if vim.fn.filereadable(fname) ~= 0 then
+		local content = vim.fn.readfile(fname)
+		local ok, data = pcall(vim.fn.json_decode, table.concat(content, "\n"))
 		if ok and data.messages then
-			current_conversation = { name = name, messages = data.messages }
+			current_conversation = { name = name, messages = data.messages, type = "listed" }
 			save_last(name)
 			ConversationManager.on_conversation_switch:dispatch({
-				name = current_conversation.name,
-				new_messages = current_conversation.messages,
+				conversation = current_conversation,
 			})
 			return true
 		end
@@ -106,8 +85,8 @@ end
 ---@return boolean success
 function ConversationManager.load_last_conversation()
 	assert(ConversationManager.is_ready())
-	if fn.filereadable(last_conv_file) ~= 0 then
-		local lines = fn.readfile(last_conv_file)
+	if vim.fn.filereadable(last_conv_file) ~= 0 then
+		local lines = vim.fn.readfile(last_conv_file)
 		local name = lines[1]
 		if current_conversation and current_conversation.name == name then
 			return true
@@ -121,62 +100,112 @@ end
 function ConversationManager.delete_conversation(name)
 	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
-	if fn.filereadable(fname) == 0 then
+	if vim.fn.filereadable(fname) == 0 then
 		return false
 	end
-	local success = fn.delete(fname) == 0
+	local success = vim.fn.delete(fname) == 0
 	if success and current_conversation and current_conversation.name == name then
 		current_conversation = nil
-		ConversationManager.on_conversation_switch:dispatch({ name = name, new_messages = {} })
+		ConversationManager.on_conversation_switch:dispatch({ conversation = current_conversation })
 	end
 	return success
 end
 
---- @return boolean success
-function ConversationManager.rename_conversation(name, new_name)
+--- Convert the current unlisted conversation to a listed conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- - `.has_conversation() == true`
+--- - `.get_current_conversation().type == "unlisted"`
+--- # Possible return value combinations:
+--- - `true, nil` if the conversion was successful
+--- - `false, <reason>` if there was an error
+--- @return boolean success, string? reason
+function ConversationManager.convert_current_conversation_to_listed(name)
 	assert(ConversationManager.is_ready())
+	assert(current_conversation)
+	assert(current_conversation.type == "unlisted")
 	local fname = conv_path .. "/" .. name .. ".json"
-	if fn.filereadable(fname) == 0 then
-		return false
+	if vim.fn.filereadable(fname) ~= 0 then
+		return false, "File already exists"
+	end
+	current_conversation.name = name
+	current_conversation.type = "listed"
+	ConversationManager.save_current_conversation()
+	return true, nil
+end
+
+--- Rename a listed conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- - `.has_conversation() == true`
+--- - `.get_current_conversation().type == "listed"`
+--- # Possible return value combinations:
+--- - `true, nil` if the name change was successful
+--- - `false, <reason>` if there was an error
+--- @return boolean success, string? reason
+function ConversationManager.rename_listed_conversation(name, new_name)
+	assert(ConversationManager.is_ready())
+	assert(current_conversation)
+	assert(current_conversation.type == "listed")
+	local fname = conv_path .. "/" .. name .. ".json"
+	if vim.fn.filereadable(fname) == 0 then
+		return false, "Conversation does not exist"
 	end
 	local new_fname = conv_path .. "/" .. new_name .. ".json"
 	if vim.fn.filereadable(new_fname) ~= 0 then
-		return false
+		return false, "Target conversation already exists"
 	end
-	local success = fn.rename(fname, new_fname) == 0
+	local success = vim.fn.rename(fname, new_fname) == 0
 	if success and current_conversation and current_conversation.name == name then
 		current_conversation.name = new_name
+		return true, nil
 	end
-	return success
+	return false, "Unknown error while saving"
 end
 
----Save the current conversation to disk.
+--- Save the current conversation to disk, if it is not an unlisted conversation.
+--- If it is, then do nothing.
+--- # Preconditions
+--- - `.has_conversation() == true`
 function ConversationManager.save_current_conversation()
 	assert(current_conversation)
-	local fname = conv_path .. "/" .. current_conversation.name .. ".json"
-	fn.writefile({ fn.json_encode({ messages = current_conversation.messages }) }, fname)
+	if current_conversation.type == "listed" then
+		local fname = conv_path .. "/" .. current_conversation.name .. ".json"
+		vim.fn.writefile({ vim.fn.json_encode({ messages = current_conversation.messages }) }, fname)
+	elseif current_conversation.type == "project" then
+		-- TODO: implement
+	end
 end
 
----Create a new conversation and notify subscribers.
----@param name string?
-function ConversationManager.new_conversation(name)
+--- Create a new conversation and notify subscribers.
+--- @param name string?
+function ConversationManager.new_listed_conversation(name)
 	assert(ConversationManager.is_ready())
 	name = name or os.date("%Y-%m-%d_%H-%M-%S") --[[@as string]]
 	local messages = { { role = "system", content = initial_system_message } }
-	current_conversation = { name = name, messages = messages }
+	current_conversation = { name = name, messages = messages, type = "listed" }
 	ConversationManager.save_current_conversation()
 	save_last(name)
 	ConversationManager.on_conversation_switch:dispatch({
-		name = name,
-		new_messages = current_conversation.messages,
+		conversation = current_conversation,
 	})
+end
+
+--- Create a new unlisted conversation.
+--- # Preconditions
+--- - `.is_ready() == true`
+function ConversationManager.new_unlisted_conversation()
+	assert(ConversationManager.is_ready())
+	local messages = { { role = "system", content = initial_system_message } }
+	current_conversation = { name = "", messages = messages, type = "unlisted" }
+	ConversationManager.on_conversation_switch:dispatch({ conversation = current_conversation })
 end
 
 ---Load last or create new conversation.
 --- @return boolean loaded
 function ConversationManager.load_last_or_create_new()
 	if not ConversationManager.load_last_conversation() then
-		ConversationManager.new_conversation()
+		ConversationManager.new_unlisted_conversation()
 		return false
 	end
 	return true
@@ -194,7 +223,6 @@ function ConversationManager.add_message(message, name)
 		return false, "conversation mismatch"
 	end
 	table.insert(current_conversation.messages, message)
-	ConversationManager.save_current_conversation()
 	ConversationManager.on_new_message:dispatch({ new_message = message })
 	return true
 end
@@ -223,8 +251,8 @@ end
 
 --- Delete the last message of the current conversation.
 --- # Preconditions:
---- - `ConversationManager.is_ready()`
---- - `ConversationManager.current_conversation ~= nil`
+--- - `ConversationManager.is_ready() == true`
+--- - `ConversationManager.has_conversation() == true`
 function ConversationManager.delete_last_message()
 	assert(current_conversation)
 	assert(ConversationManager.is_ready())
@@ -277,10 +305,10 @@ end
 function ConversationManager.generate_response()
 	assert(current_conversation)
 	assert(ConversationManager.is_ready())
-	local response_status = ChatCompletions.post_request(model, current_conversation.messages, function(message)
+	current_response = ChatCompletions.post_request(model, current_conversation.messages, function(message)
 		ConversationManager.add_message(message)
+		ConversationManager.save_current_conversation()
 	end)
-	current_response = response_status
 end
 
 --- Generate a response and stream the result to the current conversation.
