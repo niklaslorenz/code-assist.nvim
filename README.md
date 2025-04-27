@@ -32,12 +32,12 @@ A plugin to interact with the openai API for Neovim
   - [x] leader + a + b -> scroll to bottom
   - [ ] Previous and next message start/end with \[c, \[C \]c \]C
     - needs message tracking
-  - [ ] help (?) for every window
+  - [ ] help (?) for every window / keymap descriptions
   - [x] Rename conversation from chat window
   - [x] Delete conversation from chat window
-  - [ ] Select conversation from chat window
+  - [x] Select conversation from chat window
   - [ ] Change chat window size in split mode
-  - [ ] Change delete keymap as it is already used by the delete feature -> leads to delay
+  - [x] Change delete keymap as it is already used by the delete feature -> leads to delay
 - [ ] Project Conversations
 - [x] Plugin opts
   - [x] model
@@ -70,12 +70,8 @@ Lazy:
 
 {
   "niklaslorenz/code-assist.nvim",
-  config = function()
-    -- nothing needed here, plugin’s init.lua wires it up
-  end,
-  keys = {
-    { "<leader>as", "<cmd>AIChatSelect<CR>", desc = "AI Chat: select conversation" },
-    { "<leader>an", "<cmd>AIChatNew<CR>",    desc = "AI Chat: new conversation" },
-  },
+  opts = {},
+  lazy = false,
+  branch = "dev",
 }
 ```
