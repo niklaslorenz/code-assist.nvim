@@ -25,6 +25,13 @@ function Interactions.open_select_window()
 end
 
 function Interactions.open_message_prompt()
+	if not ConversationManager.is_ready() then
+		vim.notify("Conversation Manager not ready.")
+		return
+	end
+	if not ConversationManager.has_conversation() then
+		ConversationManager.new_unlisted_conversation()
+	end
 	vim.ui.input({ prompt = "You: " }, function(input)
 		if not input then
 			return
@@ -33,11 +40,11 @@ function Interactions.open_message_prompt()
 			vim.notify("Conversation Manager not ready.")
 			return
 		end
-		local success, reason = ConversationManager.add_message({ role = "user", content = input })
-		if success then
+		local ok, reason = ConversationManager.add_message({ role = "user", content = input })
+		if ok then
 			ConversationManager.generate_streaming_response()
-		elseif reason then
-			vim.notify(reason, vim.log.levels.ERROR)
+		else
+			vim.notify(reason or "Unknown error", vim.log.levels.WARN)
 		end
 	end)
 end
@@ -88,14 +95,14 @@ function Interactions.rename_current_conversation()
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
+	if not ConversationManager.is_ready() then
+		vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
+		return
+	end
 	local switch = {
 		["listed"] = function()
 			vim.ui.input({ prompt = "Rename:", default = conversation.name }, function(input)
 				if not input then
-					return
-				end
-				if not ConversationManager.is_ready() then
-					vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
 					return
 				end
 				local ok, msg = ConversationManager.rename_listed_conversation(conversation.name, input)
@@ -109,10 +116,6 @@ function Interactions.rename_current_conversation()
 				if not input then
 					return
 				end
-				if not ConversationManager.is_ready() then
-					vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
-					return
-				end
 				local ok, msg = ConversationManager.convert_current_conversation_to_listed(input)
 				if not ok then
 					vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
@@ -121,27 +124,33 @@ function Interactions.rename_current_conversation()
 		end,
 		["project"] = function()
 			-- TODO: implement
-			vim.notify("Saving project conversations is not supported yet")
+			error("Saving project conversations is not supported yet")
 		end,
 	}
 	local switch_default = function()
-		vim.notify("Invalid conversation type: " .. conversation.type, vim.log.levels.ERROR)
+		error("Invalid conversation type: " .. conversation.type)
 	end;
 	(switch[conversation.type] or switch_default)()
 end
 
 function Interactions.delete_current_conversation()
+	if not ConversationManager.has_conversation() then
+		vim.notify("No current conversation")
+		return
+	end
 	local name = ConversationManager.get_current_conversation().name
 	vim.ui.input({ prompt = "Delete?" }, function(input)
-		if not input or input ~= "yes" then
+		if not input or input ~= "yes" and input ~= "y" then
 			return
 		end
 		if not ConversationManager.is_ready() then
 			vim.notify("Conversation Manager is not ready")
 			return
 		end
-		ConversationManager.delete_conversation(name)
-		-- TODO: What to do after deleting the current conversation?
+		local ok, reason = ConversationManager.delete_conversation(name)
+		if not ok then
+			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+		end
 	end)
 end
 
@@ -150,12 +159,20 @@ function Interactions.delete_last_message()
 		vim.notify("Conversation Manager is not ready")
 		return
 	end
+	if not ConversationManager.has_conversation() then
+		vim.notify("No current conversation", vim.log.level.INFO)
+		return
+	end
 	ConversationManager.delete_last_message()
 end
 
 function Interactions.generate_response()
 	if not ConversationManager.is_ready() then
 		vim.notify("Conversation Manager is not ready")
+		return
+	end
+	if not ConversationManager.has_conversation() then
+		vim.notify("No current conversation", vim.log.level.INFO)
 		return
 	end
 	ConversationManager.generate_streaming_response()

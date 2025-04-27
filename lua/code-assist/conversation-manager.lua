@@ -26,16 +26,16 @@ local current_conversation = nil
 --- @type ChatCompletionResponseStatus | nil
 local current_response = nil
 
----Ensure that a directory exists.
----@param path string
+--- Ensure that a directory exists.
+--- @param path string
 local function ensure_dir(path)
 	if vim.fn.isdirectory(path) == 0 then
 		vim.fn.mkdir(path, "p")
 	end
 end
 
----Save the last conversation name to disk.
----@param name string
+--- Save the last conversation name to disk.
+--- @param name string
 local function save_last(name)
 	vim.fn.writefile({ name }, last_conv_file)
 end
@@ -46,8 +46,9 @@ function ConversationManager.setup()
 	ensure_dir(conv_path)
 end
 
----List all saved conversation names.
----@return string[]
+--- List all saved conversation names.
+--- @nodiscard
+--- @return string[]
 function ConversationManager.list_conversations()
 	local files = vim.fn.readdir(conv_path)
 	local convs = {}
@@ -60,48 +61,59 @@ function ConversationManager.list_conversations()
 	return convs
 end
 
----Load a saved conversation and notify subscribers.
----@param name string
----@return boolean success
+--- Load a saved conversation and notify subscribers.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- @nodiscard
+--- @param name string
+--- @return boolean success, string? reason
 function ConversationManager.load_conversation(name)
 	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
-	if vim.fn.filereadable(fname) ~= 0 then
-		local content = vim.fn.readfile(fname)
-		local ok, data = pcall(vim.fn.json_decode, table.concat(content, "\n"))
-		if ok and data.messages then
-			current_conversation = { name = name, messages = data.messages, type = "listed" }
-			save_last(name)
-			ConversationManager.on_conversation_switch:dispatch({
-				conversation = current_conversation,
-			})
-			return true
-		end
+	if vim.fn.filereadable(fname) == 0 then
+		return false, "Conversation does not exist"
 	end
-	return false
+	local content = vim.fn.readfile(fname)
+	local ok, data = pcall(vim.fn.json_decode, table.concat(content, "\n"))
+	if ok and data.messages then
+		current_conversation = { name = name, messages = data.messages, type = "listed" }
+		save_last(name)
+		ConversationManager.on_conversation_switch:dispatch({
+			conversation = current_conversation,
+		})
+		return true
+	end
+	return false, data
 end
 
----Load the last conversation (if exists).
----@return boolean success
+--- Load the last conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- @nodiscard
+--- @return boolean success, string? reason
 function ConversationManager.load_last_conversation()
 	assert(ConversationManager.is_ready())
-	if vim.fn.filereadable(last_conv_file) ~= 0 then
-		local lines = vim.fn.readfile(last_conv_file)
-		local name = lines[1]
-		if current_conversation and current_conversation.name == name then
-			return true
-		end
-		return ConversationManager.load_conversation(name)
+	if vim.fn.filereadable(last_conv_file) == 0 then
+		return false, "No previous conversation"
 	end
-	return false
+	local lines = vim.fn.readfile(last_conv_file)
+	local name = lines[1]
+	if current_conversation and current_conversation.name == name then
+		return true
+	end
+	return ConversationManager.load_conversation(name)
 end
 
---- @return boolean success
+--- Delete a conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- @nodiscard
+--- @return boolean success, string? reason
 function ConversationManager.delete_conversation(name)
 	assert(ConversationManager.is_ready())
 	local fname = conv_path .. "/" .. name .. ".json"
 	if vim.fn.filereadable(fname) == 0 then
-		return false
+		return false, "Conversation does not exist"
 	end
 	local success = vim.fn.delete(fname) == 0
 	if success and current_conversation and current_conversation.name == name then
@@ -116,9 +128,7 @@ end
 --- - `.is_ready() == true`
 --- - `.has_conversation() == true`
 --- - `.get_current_conversation().type == "unlisted"`
---- # Possible return value combinations:
---- - `true, nil` if the conversion was successful
---- - `false, <reason>` if there was an error
+--- @nodiscard
 --- @return boolean success, string? reason
 function ConversationManager.convert_current_conversation_to_listed(name)
 	assert(ConversationManager.is_ready())
@@ -130,8 +140,11 @@ function ConversationManager.convert_current_conversation_to_listed(name)
 	end
 	current_conversation.name = name
 	current_conversation.type = "listed"
-	ConversationManager.save_current_conversation()
-	return true, nil
+	local ok, reason = ConversationManager.save_current_conversation()
+	if not ok then
+		vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+	end
+	return true
 end
 
 --- Rename a listed conversation.
@@ -139,9 +152,7 @@ end
 --- - `.is_ready() == true`
 --- - `.has_conversation() == true`
 --- - `.get_current_conversation().type == "listed"`
---- # Possible return value combinations:
---- - `true, nil` if the name change was successful
---- - `false, <reason>` if there was an error
+--- @nodiscard
 --- @return boolean success, string? reason
 function ConversationManager.rename_listed_conversation(name, new_name)
 	assert(ConversationManager.is_ready())
@@ -158,33 +169,46 @@ function ConversationManager.rename_listed_conversation(name, new_name)
 	local success = vim.fn.rename(fname, new_fname) == 0
 	if success and current_conversation and current_conversation.name == name then
 		current_conversation.name = new_name
-		return true, nil
+		return true
 	end
 	return false, "Unknown error while saving"
 end
 
---- Save the current conversation to disk, if it is not an unlisted conversation.
---- If it is, then do nothing.
+--- Save the current conversation to disk.
 --- # Preconditions
+--- - `.is_ready() == true`
 --- - `.has_conversation() == true`
+--- - `.get_current_conversation().type == "listed"|"project"`
+--- @nodiscard
+--- @return boolean success, string? reason
 function ConversationManager.save_current_conversation()
+	assert(ConversationManager.is_ready())
 	assert(current_conversation)
+	assert(current_conversation.type ~= "unlisted")
 	if current_conversation.type == "listed" then
 		local fname = conv_path .. "/" .. current_conversation.name .. ".json"
 		vim.fn.writefile({ vim.fn.json_encode({ messages = current_conversation.messages }) }, fname)
+		return true
 	elseif current_conversation.type == "project" then
 		-- TODO: implement
+		return false, "Saving project conversations is not supported yet"
 	end
+	error("Unknown conversation type")
 end
 
---- Create a new conversation and notify subscribers.
+--- Create a new listed conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
 --- @param name string?
 function ConversationManager.new_listed_conversation(name)
 	assert(ConversationManager.is_ready())
 	name = name or os.date("%Y-%m-%d_%H-%M-%S") --[[@as string]]
 	local messages = { { role = "system", content = initial_system_message } }
 	current_conversation = { name = name, messages = messages, type = "listed" }
-	ConversationManager.save_current_conversation()
+	local ok, reason = ConversationManager.save_current_conversation()
+	if not ok then
+		vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+	end
 	save_last(name)
 	ConversationManager.on_conversation_switch:dispatch({
 		conversation = current_conversation,
@@ -192,7 +216,7 @@ function ConversationManager.new_listed_conversation(name)
 end
 
 --- Create a new unlisted conversation.
---- # Preconditions
+--- # Preconditions:
 --- - `.is_ready() == true`
 function ConversationManager.new_unlisted_conversation()
 	assert(ConversationManager.is_ready())
@@ -201,7 +225,9 @@ function ConversationManager.new_unlisted_conversation()
 	ConversationManager.on_conversation_switch:dispatch({ conversation = current_conversation })
 end
 
----Load last or create new conversation.
+--- Load last conversation or create a new unlisted conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
 --- @return boolean loaded
 function ConversationManager.load_last_or_create_new()
 	if not ConversationManager.load_last_conversation() then
@@ -211,31 +237,24 @@ function ConversationManager.load_last_or_create_new()
 	return true
 end
 
----Append a message to the current conversation, save, and notify.
----@param message Message
----@param name string? Optional conversation name to verify
----@return boolean success, string? reason
-function ConversationManager.add_message(message, name)
-	if not current_conversation then
-		return false, "no current conversation"
-	end
-	if name and name ~= current_conversation.name then
-		return false, "conversation mismatch"
-	end
+--- Append a message to the current conversation.
+--- # Preconditions:
+--- - `.has_current_conversation() == true`
+--- @param message Message
+function ConversationManager.add_message(message)
+	assert(current_conversation)
 	table.insert(current_conversation.messages, message)
 	ConversationManager.on_new_message:dispatch({ new_message = message })
-	return true
 end
 
 --- Extend the last message of the current conversation.
+--- # Preconditions:
+--- - `.has_current_conversation() == true`
+--- @nodiscard
 --- @param msg_delta string
-function ConversationManager.extend_last_message(msg_delta, conversation_name)
-	if not current_conversation then
-		return false, "no current conversation"
-	end
-	if conversation_name and current_conversation.name ~= conversation_name then
-		return false, "conversation mismatch"
-	end
+--- @return boolean success, string? reason
+function ConversationManager.extend_last_message(msg_delta)
+	assert(current_conversation)
 	local last_msg = current_conversation.messages[#current_conversation.messages]
 	if not last_msg then
 		return false, "no chat messages"
@@ -247,6 +266,7 @@ function ConversationManager.extend_last_message(msg_delta, conversation_name)
 	ConversationManager.on_message_extend:dispatch({
 		delta = msg_delta,
 	})
+	return true
 end
 
 --- Delete the last message of the current conversation.
@@ -254,8 +274,8 @@ end
 --- - `ConversationManager.is_ready() == true`
 --- - `ConversationManager.has_conversation() == true`
 function ConversationManager.delete_last_message()
-	assert(current_conversation)
 	assert(ConversationManager.is_ready())
+	assert(current_conversation)
 	local message_count = #current_conversation.messages
 	if message_count == 0 then
 		return
@@ -281,40 +301,45 @@ function ConversationManager.get_status()
 	return current_response
 end
 
+--- Determine whether there is an active conversation.
 --- @nodiscard
+--- @return boolean has_conversation
 function ConversationManager.has_conversation()
 	return current_conversation ~= nil
 end
 
---- Determine if the conversation manager is ready to generate a new response.
+--- Determine whether the conversation manager is ready to generate a new response.
 --- @nodiscard
 --- @return boolean ready
 function ConversationManager.is_ready()
-	if not current_response then
-		return true
-	end
-	if not current_response.complete then
-		print("not ready. Status")
-		print(current_response)
-		return false
-	end
-	return true
+	return not current_response or current_response.complete
 end
 
 --- Generate a response for the current conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- - `.has_current_conversation() == true`
 function ConversationManager.generate_response()
-	assert(current_conversation)
 	assert(ConversationManager.is_ready())
+	assert(current_conversation)
 	current_response = ChatCompletions.post_request(model, current_conversation.messages, function(message)
 		ConversationManager.add_message(message)
-		ConversationManager.save_current_conversation()
+		if current_conversation.type ~= "unlisted" then
+			local ok, reason = ConversationManager.save_current_conversation()
+			if not ok then
+				vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+			end
+		end
 	end)
 end
 
 --- Generate a response and stream the result to the current conversation.
+--- # Preconditions:
+--- - `.is_ready() == true`
+--- - `.has_conversation() == true`
 function ConversationManager.generate_streaming_response()
-	assert(current_conversation)
 	assert(ConversationManager.is_ready())
+	assert(current_conversation)
 	local response_status = ChatCompletions.post_streaming_request(
 		model,
 		current_conversation.messages,
@@ -333,7 +358,10 @@ function ConversationManager.generate_streaming_response()
 						end
 					else
 						if current_delta_msg then
-							ConversationManager.extend_last_message(current_delta_msg)
+							local ok, reason = ConversationManager.extend_last_message(current_delta_msg)
+							if not ok then
+								vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+							end
 							current_delta_msg = nil
 						end
 						ConversationManager.add_message({
@@ -344,11 +372,19 @@ function ConversationManager.generate_streaming_response()
 				end
 			end
 			if current_delta_msg then
-				ConversationManager.extend_last_message(current_delta_msg)
+				local ok, reason = ConversationManager.extend_last_message(current_delta_msg)
+				if not ok then
+					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+				end
 			end
 		end,
 		function(_)
-			ConversationManager.save_current_conversation()
+			if current_conversation.type ~= "unlisted" then
+				local ok, reason = ConversationManager.save_current_conversation()
+				if not ok then
+					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+				end
+			end
 		end
 	)
 	current_response = response_status

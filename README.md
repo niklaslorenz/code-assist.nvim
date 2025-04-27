@@ -4,23 +4,21 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
-- [ ] Define location for user issued requests to the conversation manager
+- [x] Define location for user issued requests to the conversation manager
   - > ui/interactions.lua
   - Handles global and window keymap actions
   - Ensures preconditions
   - Notifies user on error
-- [ ] Ensure compliance to the conversation manager preconditions
-  - [ ] Define all preconditions
-  - [ ] Define result scenarios
-  - [ ] Ensure proper handling of results
+- [x] Ensure compliance to the conversation manager preconditions
+  - [x] Define all preconditions
+  - [x] Ensure proper handling of results
 - [ ] Conversation sorting in selection screen
   - [ ] keymap with o-<sort order key>
   - [ ] plugin opt for default sorting order
 - [ ] Dynamic message filters
   - [ ] Plugin opt for default filter
-- [ ] implement remaining keymap commands in commands.chat
 - [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
-  - [ ] needs message tracking
+  - needs message tracking
 - [x] implement a chat completions request object
   - [x] put the streaming request into chat-completions and keep the interface.streaming.lua file
         for processing logic only
