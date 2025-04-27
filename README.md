@@ -5,6 +5,7 @@ A plugin to interact with the openai API for Neovim
 ## TODO
 
 - [ ] Define location for user issued requests to the conversation manager
+  - > ui/interactions.lua
   - Handles global and window keymap actions
   - Ensures preconditions
   - Notifies user on error

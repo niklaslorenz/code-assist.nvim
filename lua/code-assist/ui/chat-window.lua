@@ -1,7 +1,6 @@
 local ChatWindow = {}
 
 local EventDispatcher = require("code-assist.event-dispatcher")
-local ConversationManager = require("code-assist.conversation-manager")
 
 --- Setup the chat buffer or setup a new one if one exists already.
 --- @return integer buffer
@@ -32,20 +31,11 @@ local last_orientation = "float"
 --- Highlighting namespace
 local ns = vim.api.nvim_create_namespace("code-assist")
 
---- Get the chat window if it is valid.
---- @return integer|nil window
-local function get_win()
-	if chat_win and vim.api.nvim_win_is_valid(chat_win) then
-		return chat_win
-	end
-	return nil
-end
-
 --- Determine whether auto scrolling is currently on.
 --- @nodiscard
 --- @return boolean auto_scroll
 local function auto_scroll()
-	local win = get_win()
+	local win = ChatWindow.get_win()
 	if not win then
 		return false
 	end
@@ -110,132 +100,19 @@ local function redraw()
 	vim.bo[chat_buf].modifiable = false
 end
 
---- Create a new keymap for the chat window.
---- @param key string
---- @param func fun()
-local function add_keymap(key, func)
-	vim.keymap.set("n", key, function()
-		func()
-	end, { buffer = chat_buf })
+--- Get the chat window if it is valid.
+--- @return integer|nil window
+function ChatWindow.get_win()
+	if chat_win and vim.api.nvim_win_is_valid(chat_win) then
+		return chat_win
+	end
+	return nil
 end
 
-local function setup_keymaps()
-	add_keymap("q", function()
-		ChatWindow.hide()
-	end)
-	add_keymap("<CR>", function()
-		vim.ui.input({ prompt = "You: " }, function(input)
-			if not input then
-				return
-			end
-			if not ConversationManager.is_ready() then
-				vim.notify("Conversation Manager is not ready")
-				return
-			end
-			local success, reason = ConversationManager.add_message({ role = "user", content = input })
-			if success then
-				ConversationManager.generate_streaming_response()
-			else
-				vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
-			end
-		end)
-	end)
-
-	add_keymap("<leader>ar", function()
-		local conversation = ConversationManager.get_current_conversation()
-		if not conversation then
-			vim.notify("No current conversation", vim.log.levels.ERROR)
-			return
-		end
-		local switch = {
-			["listed"] = function()
-				vim.ui.input({ prompt = "Rename:", default = conversation.name }, function(input)
-					if not input then
-						return
-					end
-					if not ConversationManager.is_ready() then
-						vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
-						return
-					end
-					local ok, msg = ConversationManager.rename_listed_conversation(conversation.name, input)
-					if not ok then
-						vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
-					end
-				end)
-			end,
-			["unlisted"] = function()
-				vim.ui.input({ prompt = "Rename:" }, function(input)
-					if not input then
-						return
-					end
-					if not ConversationManager.is_ready() then
-						vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
-						return
-					end
-					local ok, msg = ConversationManager.convert_current_conversation_to_listed(input)
-					if not ok then
-						vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
-					end
-				end)
-			end,
-			["project"] = function()
-				-- TODO: implement
-				vim.notify("Saving project conversations is not supported yet")
-			end,
-		}
-		local switch_default = function()
-			vim.notify("Invalid conversation type: " .. conversation.type, vim.log.levels.ERROR)
-		end;
-		(switch[conversation.type] or switch_default)()
-	end)
-
-	add_keymap("<leader>adc", function()
-		local name = ConversationManager.get_current_conversation().name
-		vim.ui.input({ prompt = "Delete?" }, function(input)
-			if not input or input ~= "yes" then
-				return
-			end
-			if not ConversationManager.is_ready() then
-				vim.notify("Conversation Manager is not ready")
-				return
-			end
-			ConversationManager.delete_conversation(name)
-			-- TODO: What to do after deleting the current conversation?
-		end)
-	end)
-	add_keymap("<leader>an", function()
-		if not ConversationManager.is_ready() then
-			vim.notify("Conversation Manager is not ready")
-			return
-		end
-		ConversationManager.new_unlisted_conversation()
-	end)
-	add_keymap("<leader>aN", function()
-		vim.ui.input({ prompt = "New:" }, function(input)
-			if not input then
-				return
-			end
-			if not ConversationManager.is_ready() then
-				vim.notify("Conversation Manager is not ready")
-				return
-			end
-			ConversationManager.new_conversation(input)
-		end)
-	end)
-	add_keymap("<leader>adm", function()
-		if not ConversationManager.is_ready() then
-			vim.notify("Conversation Manager is not ready")
-			return
-		end
-		ConversationManager.delete_last_message()
-	end)
-	add_keymap("<leader>ag", function()
-		if not ConversationManager.is_ready() then
-			vim.notify("Conversation Manager is not ready")
-			return
-		end
-		ConversationManager.generate_streaming_response()
-	end)
+--- Get the chat buffer.
+--- @return integer
+function ChatWindow.get_chat_buf()
+	return chat_buf
 end
 
 --- Append a message to the chat window.
@@ -269,7 +146,7 @@ end
 
 --- Scroll the chat window to the bottom.
 function ChatWindow.scroll_to_bottom()
-	local win = get_win()
+	local win = ChatWindow.get_win()
 	if win then
 		vim.api.nvim_win_set_cursor(win, { vim.api.nvim_buf_line_count(chat_buf), 0 })
 	end
@@ -288,7 +165,7 @@ end
 
 --- Hide the chat window.
 function ChatWindow.hide()
-	local win = get_win()
+	local win = ChatWindow.get_win()
 	if not win then
 		return
 	end
@@ -300,7 +177,7 @@ end
 --- @param orientation WindowOrientation?
 function ChatWindow.open(orientation)
 	-- If already open, jump there
-	local win = get_win()
+	local win = ChatWindow.get_win()
 	if win then
 		if last_orientation == orientation then
 			vim.api.nvim_set_current_win(win)
@@ -339,7 +216,6 @@ function ChatWindow.open(orientation)
 	vim.wo[win].wrap = true
 	vim.wo[win].linebreak = true
 	vim.api.nvim_win_set_buf(win, chat_buf)
-	setup_keymaps()
 	ChatWindow.on_visibility_change:dispatch("show")
 end
 
