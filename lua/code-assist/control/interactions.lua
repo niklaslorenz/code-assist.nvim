@@ -26,7 +26,7 @@ end
 
 function Interactions.open_message_prompt()
 	if not ConversationManager.is_ready() then
-		vim.notify("Conversation Manager not ready.")
+		vim.notify("Conversation Manager not ready")
 		return
 	end
 	if not ConversationManager.has_conversation() then
@@ -37,15 +37,15 @@ function Interactions.open_message_prompt()
 			return
 		end
 		if not ConversationManager.is_ready() then
-			vim.notify("Conversation Manager not ready.")
+			vim.notify("Conversation Manager not ready")
 			return
 		end
-		local ok, reason = ConversationManager.add_message({ role = "user", content = input })
-		if ok then
-			ConversationManager.generate_streaming_response()
-		else
-			vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+		if not ConversationManager.has_conversation() then
+			vim.notify("No current conversation")
+			return
 		end
+		ConversationManager.add_message({ role = "user", content = input })
+		ConversationManager.generate_streaming_response()
 	end)
 end
 

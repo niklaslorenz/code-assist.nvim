@@ -61,6 +61,7 @@ A plugin to interact with the openai API for Neovim
 ## BUGS
 
 - When renaming a convesation, last_conversation is not updated resulting in a new conversation being created when opened again after restart
+- When conversations get too long, the curl command that issues the response request cannot be executed any more as the entire conversation is currently relayed via a parameter
 
 ## Setup
 
