@@ -1,6 +1,7 @@
 local ChatCompletions = {}
 
 local ChatCompletionDecoder = require("code-assist.assistant.interface.chat-completion-decoder")
+local Curl = require("plenary.curl")
 
 local api_key = os.getenv("OPENAI_API_KEY")
 if not api_key then
@@ -14,6 +15,7 @@ end
 --- @param callback fun(reply: Message)
 --- @return ChatCompletionResponseStatus status
 ChatCompletions.post_request = function(model, messages, callback)
+	-- TODO: implement plenary posting
 	local payload = vim.fn.json_encode({
 		model = model,
 		messages = messages,
@@ -65,8 +67,7 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 		messages = messages,
 		stream = true,
 	})
-	--- @type string|nil
-	local buffer = nil
+
 	--- @type ChatCompletionResponseStatus
 	local status = {
 		chunks = {},
@@ -74,53 +75,50 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 		complete = false,
 	}
 
-	vim.fn.jobstart({
-		"curl",
-		"-s",
-		"https://api.openai.com/v1/chat/completions",
-		"-H",
-		"Content-Type: application/json",
-		"-H",
-		"Authorization: Bearer " .. api_key,
-		"-d",
-		payload,
-	}, {
-		stdout_buffered = false,
-		on_stdout = function(_, data)
+	Curl.post("https://api.openai.com/v1/chat/completions", {
+		body = payload,
+		headers = {
+			["Content-Type"] = "application/json",
+			["Authorization"] = "Bearer " .. api_key,
+		},
+		raw = { "-s" },
+		stream = vim.schedule_wrap(function(err, data)
+			if err then
+				vim.notify("Http response error: " .. err, vim.log.levels.ERROR)
+				return
+			end
 			if status.complete then
 				return
 			end
-			local decode_ok, new_chunks_or_error_msg, new_buffer, new_complete =
-					pcall(ChatCompletionDecoder.decode_chat_completion_chunks, data, buffer)
+			local decode_ok, new_chunk_or_error_msg, new_complete =
+				pcall(ChatCompletionDecoder.decode_chat_completion_chunk, data)
 			if decode_ok then
-				local new_chunks = new_chunks_or_error_msg
-				for _, chunk in ipairs(new_chunks) do
-					table.insert(status.chunks, chunk)
+				local new_chunk = new_chunk_or_error_msg
+				if new_chunk then
+					table.insert(status.chunks, new_chunk)
 				end
 				status.complete = new_complete
-				buffer = new_buffer
-				local callback_ok, callback_error_msg = pcall(on_chunks_ready, status, new_chunks)
+				local callback_ok, callback_error_msg = pcall(on_chunks_ready, status, { new_chunk })
 				if not callback_ok then
-					print("Error in post_streaming_request chunk callback:")
-					print(callback_error_msg)
+					vim.notify(callback_error_msg, vim.log.levels.ERROR)
 				end
 			else
-				local error_msg = new_chunks_or_error_msg
-				print("Error in decoding chat completion chunks:")
-				print(error_msg)
+				local error_msg = new_chunk_or_error_msg --[[@as string]]
+				vim.notify(error_msg, vim.log.levels.ERROR)
 			end
-			if status.complete and on_finish then
-				status.complete = true
-				local finish_callback_ok, error_msg = pcall(on_finish, status)
-				if not finish_callback_ok then
-					print("Error in post_streaming_request finish callback:")
-					print(error_msg)
+		end),
+		callback = vim.schedule_wrap(function(response)
+			if response.status ~= 200 then
+				vim.notify("Http response error: " .. response.status, vim.log.levels.ERROR)
+			end
+			status.complete = true
+			if on_finish then
+				local ok, reason = pcall(on_finish, status)
+				if not ok then
+					vim.notify(reason, vim.log.levels.ERROR)
 				end
 			end
-		end,
-		on_finish = function(_)
-			status.complete = true
-		end,
+		end),
 	})
 	return status
 end

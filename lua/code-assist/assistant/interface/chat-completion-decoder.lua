@@ -72,41 +72,21 @@ local function extract_chunk(data)
 	return chunk
 end
 
---- @param data string[] An array of data lines
---- @param buffer string? The previous incomplete data line
---- @return ChatCompletionChunk[] chunks, string? buffer, boolean finished
-function ChatCompletionDecoder.decode_chat_completion_chunks(data, buffer)
-	--- @type ChatCompletionChunk[]
-	local chunks = {}
-
-	for i, line in ipairs(data) do
-		if line and line ~= "" then
-			if buffer then
-				line = buffer .. line
-				buffer = nil
-			end
-			if line:match("^data: ") then
-				local line_data = line:sub(7)
-				if line_data == "[DONE]" then
-					return chunks, nil, true
-				end
-				local ok, decoded = pcall(vim.fn.json_decode, line_data)
-				if ok then
-					local chunk = extract_chunk(decoded)
-					table.insert(chunks, chunk)
-				else
-					buffer = line
-				end
-			else
-				buffer = line
-				if string.len(line) > 6 then
-					print("Error context: " .. line)
-					error("Error decoding response data: Wrong prefix.")
-				end
-			end
-		end
+--- @param line string
+--- @return ChatCompletionChunk? chunk, boolean finished
+function ChatCompletionDecoder.decode_chat_completion_chunk(line)
+	if not line or line == "" then
+		return nil, false
 	end
-	return chunks, buffer, false
+	if not line:match("^data: ") then
+		error("Wrong data chunk format")
+	end
+	local data = line:sub(7)
+	if data == "[DONE]" then
+		return nil, true
+	end
+	local decoded = vim.fn.json_decode(data)
+	return extract_chunk(decoded), false
 end
 
 return ChatCompletionDecoder

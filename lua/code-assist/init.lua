@@ -1,5 +1,11 @@
 local M = {}
 
+local has_plenary = pcall(require, "plenary")
+if not has_plenary then
+	error("plenary.nvim is required but not installed")
+	return
+end
+
 local PluginOptions = require("code-assist.options")
 local ConversationManager = require("code-assist.conversation-manager")
 local ChatWindowControl = require("code-assist.control.chat-window-control")
