@@ -21,6 +21,13 @@ local function setup_conversation_manager_events()
 		local messages = event.conversation ~= nil and event.conversation.messages or {}
 		local filtered = filter_chat_messages(messages)
 		ChatWindow.replace_messages(filtered)
+		local title = nil
+		if event.conversation.type == "listed" then
+			title = "[Conversation] " .. event.conversation.name
+		elseif event.conversation.type == "project" then
+			title = "[" .. event.conversation.name .. "]"
+		end
+		ChatWindow.set_title(title)
 	end)
 	ConversationManager.on_new_message:subscribe(function(event)
 		if event.new_message.role ~= "system" then

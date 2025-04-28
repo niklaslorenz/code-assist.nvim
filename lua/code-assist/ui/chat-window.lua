@@ -25,6 +25,9 @@ local chat_win = nil
 --- @type Message[]
 local messages = {}
 
+--- @type string?
+local title = nil
+
 --- @type WindowOrientation
 local last_orientation = "float"
 
@@ -113,6 +116,18 @@ end
 --- @return integer
 function ChatWindow.get_chat_buf()
 	return chat_buf
+end
+
+--- @param new_title string?
+function ChatWindow.set_title(new_title)
+	title = new_title
+	local win = ChatWindow.get_win()
+	if not win then
+		return
+	end
+	local win_config = vim.api.nvim_win_get_config(win)
+	win_config.title = title
+	vim.api.nvim_win_set_config(win, win_config)
 end
 
 --- Append a message to the chat window.
@@ -209,6 +224,7 @@ function ChatWindow.open(orientation)
 			col = col,
 			style = "minimal",
 			border = "rounded",
+			title = title,
 		})
 	end
 	last_orientation = orientation
