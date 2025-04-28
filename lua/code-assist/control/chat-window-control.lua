@@ -18,7 +18,7 @@ end
 
 local function setup_conversation_manager_events()
 	ConversationManager.on_conversation_switch:subscribe(function(event)
-		local messages = event.conversation and event.conversation.messages or {}
+		local messages = event.conversation ~= nil and event.conversation.messages or {}
 		local filtered = filter_chat_messages(messages)
 		ChatWindow.replace_messages(filtered)
 	end)

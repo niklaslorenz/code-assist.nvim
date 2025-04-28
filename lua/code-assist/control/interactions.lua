@@ -160,7 +160,7 @@ function Interactions.delete_last_message()
 		return
 	end
 	if not ConversationManager.has_conversation() then
-		vim.notify("No current conversation", vim.log.level.INFO)
+		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
 	ConversationManager.delete_last_message()
@@ -172,7 +172,7 @@ function Interactions.generate_response()
 		return
 	end
 	if not ConversationManager.has_conversation() then
-		vim.notify("No current conversation", vim.log.level.INFO)
+		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
 	ConversationManager.generate_streaming_response()

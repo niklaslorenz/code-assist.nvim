@@ -282,8 +282,7 @@ function ConversationManager.delete_last_message()
 	end
 	table.remove(current_conversation.messages, message_count)
 	ConversationManager.on_conversation_switch:dispatch({
-		name = current_conversation.name,
-		new_messages = current_conversation.messages,
+		conversation = current_conversation,
 	})
 end
 
