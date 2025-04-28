@@ -318,16 +318,14 @@ end
 --- # Preconditions:
 --- - `.is_ready() == true`
 --- - `.has_current_conversation() == true`
-function ConversationManager.generate_response()
+--- @param on_finish fun(conversation: Conversation)?
+function ConversationManager.generate_response(on_finish)
 	assert(ConversationManager.is_ready())
 	assert(current_conversation)
 	current_response = ChatCompletions.post_request(model, current_conversation.messages, function(message)
 		ConversationManager.add_message(message)
-		if current_conversation.type ~= "unlisted" then
-			local ok, reason = ConversationManager.save_current_conversation()
-			if not ok then
-				vim.notify(reason or "Unknown error", vim.log.levels.WARN)
-			end
+		if on_finish then
+			on_finish(current_conversation)
 		end
 	end)
 end
@@ -336,7 +334,8 @@ end
 --- # Preconditions:
 --- - `.is_ready() == true`
 --- - `.has_conversation() == true`
-function ConversationManager.generate_streaming_response()
+--- @param on_finish fun(conversation: Conversation)?
+function ConversationManager.generate_streaming_response(on_finish)
 	assert(ConversationManager.is_ready())
 	assert(current_conversation)
 	local response_status = ChatCompletions.post_streaming_request(
@@ -378,11 +377,8 @@ function ConversationManager.generate_streaming_response()
 			end
 		end,
 		function(_)
-			if current_conversation.type ~= "unlisted" then
-				local ok, reason = ConversationManager.save_current_conversation()
-				if not ok then
-					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
-				end
+			if on_finish then
+				on_finish(current_conversation)
 			end
 		end
 	)

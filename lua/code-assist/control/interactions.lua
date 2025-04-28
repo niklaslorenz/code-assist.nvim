@@ -45,7 +45,14 @@ function Interactions.open_message_prompt()
 			return
 		end
 		ConversationManager.add_message({ role = "user", content = input })
-		ConversationManager.generate_streaming_response()
+		ConversationManager.generate_streaming_response(function(conversation)
+			if conversation.type ~= "unlisted" then
+				local ok, reason = ConversationManager.save_current_conversation()
+				if not ok then
+					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+				end
+			end
+		end)
 	end)
 end
 
@@ -144,7 +151,7 @@ function Interactions.delete_current_conversation()
 			return
 		end
 		if not ConversationManager.is_ready() then
-			vim.notify("Conversation Manager is not ready")
+			vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
 			return
 		end
 		local ok, reason = ConversationManager.delete_conversation(name)
@@ -156,7 +163,7 @@ end
 
 function Interactions.delete_last_message()
 	if not ConversationManager.is_ready() then
-		vim.notify("Conversation Manager is not ready")
+		vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
 		return
 	end
 	if not ConversationManager.has_conversation() then
@@ -164,6 +171,10 @@ function Interactions.delete_last_message()
 		return
 	end
 	ConversationManager.delete_last_message()
+	local ok, reason = ConversationManager.save_current_conversation()
+	if not ok then
+		vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+	end
 end
 
 function Interactions.generate_response()
