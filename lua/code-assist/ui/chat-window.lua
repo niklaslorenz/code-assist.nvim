@@ -126,12 +126,16 @@ function ChatWindow.set_title(new_title)
 		return
 	end
 	local win_config = vim.api.nvim_win_get_config(win)
+	if not win_config.relative or win_config.relative == "" then
+		return
+	end
 	win_config.title = title
 	if not title then
 		win_config.title_pos = nil
 	else
 		win_config.title_pos = "center"
 	end
+	print("Relative: " .. win_config.relative)
 	vim.api.nvim_win_set_config(win, win_config)
 end
 
