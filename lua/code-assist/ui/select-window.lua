@@ -2,6 +2,7 @@ local SelectWindow = {}
 
 local ConversationManager = require("code-assist.conversation-manager")
 local ChatWindow = require("code-assist.ui.chat-window")
+local Options = require("code-assist.options")
 
 --- @type integer | nil
 local select_win = nil
@@ -11,6 +12,9 @@ local select_buf = nil
 
 --- @type string[]
 local conv_list = {}
+
+--- @type "first"|"last"|"name"
+local sorting = Options.default_sort_order
 
 local function get_win()
 	if select_win and vim.api.nvim_win_is_valid(select_win) then
@@ -74,6 +78,21 @@ local function rename_hovered()
 	end)
 end
 
+local function order_first()
+	sorting = "first"
+	SelectWindow.refresh()
+end
+
+local function order_last()
+	sorting = "last"
+	SelectWindow.refresh()
+end
+
+local function order_name()
+	sorting = "name"
+	SelectWindow.refresh()
+end
+
 local function setup_keymaps()
 	local win = get_win()
 	local buf = get_buf()
@@ -96,6 +115,17 @@ local function setup_keymaps()
 
 	vim.keymap.set("n", "r", function()
 		rename_hovered()
+	end, { buffer = buf })
+
+	vim.keymap.set("n", "o", "<NOP>", { buffer = buf, noremap = true, silent = true })
+	vim.keymap.set("n", "of", function()
+		order_first()
+	end, { buffer = buf })
+	vim.keymap.set("n", "ol", function()
+		order_last()
+	end, { buffer = buf })
+	vim.keymap.set("n", "on", function()
+		order_name()
 	end, { buffer = buf })
 	return true
 end
@@ -147,7 +177,7 @@ end
 function SelectWindow.refresh()
 	local buf = get_buf()
 	assert(buf)
-	conv_list = ConversationManager.list_conversations()
+	conv_list = ConversationManager.list_conversations(sorting)
 	if vim.tbl_isempty(conv_list) then
 		vim.notify("No conversations found", vim.log.levels.INFO)
 	end

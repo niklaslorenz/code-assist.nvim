@@ -10,6 +10,8 @@ local last_conv_file = data_path .. "/last_conv"
 local model = PluginOptions.model
 local initial_system_message = PluginOptions.system_message
 
+--- @alias ConversationSorting "first"|"last"|"name"
+
 --- @class ConversationSwitchEvent
 --- @field conversation Conversation?
 
@@ -48,17 +50,60 @@ end
 
 --- List all saved conversation names.
 --- @nodiscard
+--- @param sorting ConversationSorting?
 --- @return string[]
-function ConversationManager.list_conversations()
+--[[
+function ConversationManager.list_conversations(sorting)
+	sorting = sorting or "last"
+	local files = vim.fn.readdir(conv_path)
+	if sorting == "name" then
+		local convs = {}
+		for _, file in ipairs(files) do
+			if file:match("%.json$") then
+				table.insert(convs, file:sub(1, -6))
+			end
+		end
+		table.sort(convs)
+		return convs
+	end
+end
+]]
+function ConversationManager.list_conversations(sorting)
+	sorting = sorting or "last"
 	local files = vim.fn.readdir(conv_path)
 	local convs = {}
+
 	for _, file in ipairs(files) do
 		if file:match("%.json$") then
-			table.insert(convs, file:sub(1, -6))
+			local name = file:sub(1, -6) -- remove the .json extension
+			local mtime = vim.fn.getftime(conv_path .. "/" .. file) -- get the modification time
+			table.insert(convs, { name = name, mtime = mtime })
 		end
 	end
-	table.sort(convs)
-	return convs
+
+	-- Sort by modification time
+	if sorting == "first" then
+		table.sort(convs, function(a, b)
+			return a.mtime < b.mtime
+		end) -- ascending order
+	elseif sorting == "last" then
+		table.sort(convs, function(a, b)
+			return a.mtime > b.mtime
+		end) -- descending order
+	else
+		-- For sorting by name
+		table.sort(convs, function(a, b)
+			return a.name < b.name
+		end)
+	end
+
+	-- Extract sorted names
+	local sorted_names = {}
+	for _, conv in ipairs(convs) do
+		table.insert(sorted_names, conv.name)
+	end
+
+	return sorted_names
 end
 
 --- Load a saved conversation and notify subscribers.

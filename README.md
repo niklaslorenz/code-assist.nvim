@@ -15,9 +15,9 @@ A plugin to interact with the openai API for Neovim
 - [x] Ensure compliance to the conversation manager preconditions
   - [x] Define all preconditions
   - [x] Ensure proper handling of results
-- [ ] Conversation sorting in selection screen
-  - [ ] keymap with o-<sort order key>
-  - [ ] plugin opt for default sorting order
+- [x] Conversation sorting in selection screen
+  - [x] keymap with o-<sort order key>
+  - [x] plugin opt for default sorting order
 - [ ] Dynamic message filters
   - [ ] Plugin opt for default filter
 - [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
