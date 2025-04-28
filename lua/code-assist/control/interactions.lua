@@ -6,11 +6,14 @@ local SelectWindow = require("code-assist.ui.select-window")
 
 local function get_current_selection()
 	local mode = vim.fn.mode()
-	if mode ~= "v" and mode ~= "V" and mode ~= "\22" then
-		error("Not in visual mode")
+	local start_pos, end_pos
+	if mode == "v" or mode == "V" or mode == "\22" then
+		start_pos = vim.fn.getpos("v")
+		end_pos = vim.fn.getpos(".")
+	else
+		start_pos = vim.fn.getpos("'<")
+		end_pos = vim.fn.getpos("'>")
 	end
-	local start_pos = vim.fn.getpos("'<") -- Start position of visual selection
-	local end_pos = vim.fn.getpos("'>") -- End position of visual selection
 
 	local start_line = start_pos[2]
 	local end_line = end_pos[2]

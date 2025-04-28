@@ -40,8 +40,14 @@ function Keymaps.setup_global_keymaps()
 	add_keymap("<leader>af", Interactions.open_floating_window, "Open floating window", nil, { "n", "v" })
 	add_keymap("<leader>ao", Interactions.open, "Open chat window", nil, { "n", "v" })
 	add_keymap("<leader>am", Interactions.open_message_prompt, "Open message prompt")
-	add_keymap("<leader>ac", Interactions.copy_selection, "Copy selection", nil, "v")
-	add_keymap("<leader>am", Interactions.open_message_prompt_for_selection, "Open message for selection", nil, "v")
+	add_keymap("<leader>ac", Interactions.copy_selection, "Copy selection", nil, { "n", "v" })
+	add_keymap(
+		"<leader>am",
+		Interactions.open_message_prompt_for_selection,
+		"Open prompt for selection",
+		nil,
+		{ "n", "v" }
+	)
 	add_keymap("<leader>ab", Interactions.scroll_to_bottom, "Scroll to bottom", nil, { "n", "v" })
 end
 
