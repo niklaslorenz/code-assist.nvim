@@ -127,6 +127,11 @@ function ChatWindow.set_title(new_title)
 	end
 	local win_config = vim.api.nvim_win_get_config(win)
 	win_config.title = title
+	if not title then
+		win_config.title_pos = nil
+	else
+		win_config.title_pos = "center"
+	end
 	vim.api.nvim_win_set_config(win, win_config)
 end
 
@@ -216,6 +221,10 @@ function ChatWindow.open(orientation)
 		local row = math.floor((vim.o.lines - h) / 2)
 		local col = math.floor((vim.o.columns - w) / 2)
 		local temp_buf = vim.api.nvim_create_buf(false, true)
+		local title_pos = nil
+		if title ~= nil then
+			title_pos = "center"
+		end
 		win = vim.api.nvim_open_win(temp_buf, true, {
 			relative = "editor",
 			width = w,
@@ -225,6 +234,7 @@ function ChatWindow.open(orientation)
 			style = "minimal",
 			border = "rounded",
 			title = title,
+			title_pos = title_pos,
 		})
 	end
 	last_orientation = orientation

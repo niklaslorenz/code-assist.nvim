@@ -4,6 +4,9 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
+- [ ] Conversation length management
+  - [ ] Conversation token length tracking
+  - [ ] Make sure that the system message is not truncated
 - [x] Define location for user issued requests to the conversation manager
   - > ui/interactions.lua
   - Handles global and window keymap actions
@@ -26,7 +29,7 @@ A plugin to interact with the openai API for Neovim
 - [-] Chat editing
   - Goals?
 - [ ] (Refatoring) Cleanup chat-window-control
-- [ ] Chat Window Title
+- [x] Chat Window Title
 - [ ] Multi Line Inputs
 - [-] Keymaps
   - [x] leader + a + b -> scroll to bottom
@@ -47,8 +50,6 @@ A plugin to interact with the openai API for Neovim
   - [ ] opts for code-block types
 - [ ] Adjustable filter for messages
   - [ ] Move filtering into chat window
-- [ ] Window Titles
-- [ ] Add Conversation manager event for name change of current conversation
   - [ ] Update window title accordingly
 - [ ] Conversation "Snippets" (see [./conversations-roadmap.md](./conversations-roadmap.md)):
   - Unnamed and unstructured conversations
@@ -61,6 +62,7 @@ A plugin to interact with the openai API for Neovim
 ## BUGS
 
 - When renaming a convesation, last_conversation is not updated resulting in a new conversation being created when opened again after restart
+- Chat window title is not updated when the active conversation is renamed
 
 ## Setup
 
