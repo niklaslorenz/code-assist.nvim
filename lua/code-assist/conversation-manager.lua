@@ -52,22 +52,6 @@ end
 --- @nodiscard
 --- @param sorting ConversationSorting?
 --- @return string[]
---[[
-function ConversationManager.list_conversations(sorting)
-	sorting = sorting or "last"
-	local files = vim.fn.readdir(conv_path)
-	if sorting == "name" then
-		local convs = {}
-		for _, file in ipairs(files) do
-			if file:match("%.json$") then
-				table.insert(convs, file:sub(1, -6))
-			end
-		end
-		table.sort(convs)
-		return convs
-	end
-end
-]]
 function ConversationManager.list_conversations(sorting)
 	sorting = sorting or "last"
 	local files = vim.fn.readdir(conv_path)
@@ -75,7 +59,7 @@ function ConversationManager.list_conversations(sorting)
 
 	for _, file in ipairs(files) do
 		if file:match("%.json$") then
-			local name = file:sub(1, -6) -- remove the .json extension
+			local name = file:sub(1, -6)                         -- remove the .json extension
 			local mtime = vim.fn.getftime(conv_path .. "/" .. file) -- get the modification time
 			table.insert(convs, { name = name, mtime = mtime })
 		end
