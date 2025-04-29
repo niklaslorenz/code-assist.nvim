@@ -249,6 +249,54 @@ function ChatWindow.open(orientation)
 	ChatWindow.on_visibility_change:dispatch("show")
 end
 
+function ChatWindow.increase_window_width()
+	local win = ChatWindow.get_win()
+	if not win then
+		return
+	end
+	local config = vim.api.nvim_win_get_config(win)
+	if config.width then
+		config.width = config.width + 10
+	end
+	vim.api.nvim_win_set_config(win, config)
+end
+
+function ChatWindow.increase_window_height()
+	local win = ChatWindow.get_win()
+	if not win then
+		return
+	end
+	local config = vim.api.nvim_win_get_config(win)
+	if config.height then
+		config.height = config.height + 5
+	end
+	vim.api.nvim_win_set_config(win, config)
+end
+
+function ChatWindow.decrease_window_width()
+	local win = ChatWindow.get_win()
+	if not win then
+		return
+	end
+	local config = vim.api.nvim_win_get_config(win)
+	if config.width then
+		config.width = config.width - 10
+	end
+	vim.api.nvim_win_set_config(win, config)
+end
+
+function ChatWindow.decrease_window_height()
+	local win = ChatWindow.get_win()
+	if not win then
+		return
+	end
+	local config = vim.api.nvim_win_get_config(win)
+	if config.height then
+		config.height = config.height - 5
+	end
+	vim.api.nvim_win_set_config(win, config)
+end
+
 --- @type EventDispatcher<WindowDisplayEvent>
 ChatWindow.on_visibility_change = EventDispatcher.new()
 

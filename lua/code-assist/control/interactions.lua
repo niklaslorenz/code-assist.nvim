@@ -40,6 +40,10 @@ local function get_current_selection()
 	return selection
 end
 
+local function get_current_filetype()
+	return vim.bo.filetype
+end
+
 function Interactions.open_floating_window()
 	ChatWindow.open("float")
 end
@@ -102,6 +106,8 @@ function Interactions.open_message_prompt_for_selection()
 		return
 	end
 	local selection = get_current_selection()
+	local filetype = get_current_filetype()
+	local content = "```" .. filetype .. "\n" .. selection .. "\n```"
 	vim.ui.input({ prompt = "You: " }, function(input)
 		if not input then
 			return
@@ -114,7 +120,7 @@ function Interactions.open_message_prompt_for_selection()
 			vim.notify("No current conversation")
 			return
 		end
-		ConversationManager.add_message({ role = "user", content = selection })
+		ConversationManager.add_message({ role = "user", content = content })
 		ConversationManager.add_message({ role = "user", content = input })
 		ConversationManager.generate_streaming_response(function(conversation)
 			if conversation.type ~= "unlisted" then
@@ -137,9 +143,11 @@ function Interactions.copy_selection()
 		return
 	end
 	local selection = get_current_selection()
+	local filetype = get_current_filetype()
+	local content = "```" .. filetype .. "\n" .. selection .. "\n```"
 	ConversationManager.add_message({
 		role = "user",
-		content = selection,
+		content = content,
 	})
 	ChatWindow.scroll_to_bottom()
 	if ConversationManager.get_current_conversation().type ~= "unlisted" then
@@ -277,6 +285,22 @@ end
 
 function Interactions.scroll_to_bottom()
 	ChatWindow.scroll_to_bottom()
+end
+
+function Interactions.increase_window_width()
+	ChatWindow.increase_window_width()
+end
+
+function Interactions.increase_window_height()
+	ChatWindow.increase_window_height()
+end
+
+function Interactions.decrease_window_width()
+	ChatWindow.decrease_window_width()
+end
+
+function Interactions.decrease_window_height()
+	ChatWindow.decrease_window_height()
 end
 
 return Interactions

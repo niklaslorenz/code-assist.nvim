@@ -39,15 +39,15 @@ A plugin to interact with the openai API for Neovim
   - [x] Rename conversation from chat window
   - [x] Delete conversation from chat window
   - [x] Select conversation from chat window
-  - [ ] Change chat window size in split mode
+  - [x] Change chat window size in split mode
   - [x] Change delete keymap as it is already used by the delete feature -> leads to delay
 - [ ] Project Conversations
 - [x] Plugin opts
   - [x] model
   - [x] system message
   - [x] color
-- [-] In visual mode, relay content to chat
-  - [ ] opts for code-block types
+- [x] In visual mode, relay content to chat
+  - [x] opts for code-block types
 - [ ] Adjustable filter for messages
   - [ ] Move filtering into chat window
 - [ ] Conversation "Snippets" (see [./conversations-roadmap.md](./conversations-roadmap.md)):

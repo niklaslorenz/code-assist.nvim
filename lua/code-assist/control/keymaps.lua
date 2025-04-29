@@ -59,6 +59,10 @@ function Keymaps.setup_chat_buffer_keymaps(window)
 	add_keymap("<leader>adc", Interactions.delete_current_conversation, "Delete conversation", window)
 	add_keymap("<leader>adm", Interactions.delete_last_message, "Delete last message", window)
 	add_keymap("<leader>ag", Interactions.generate_response, "Generate response", window)
+	add_keymap("H", Interactions.increase_window_width, "Increase chat width", window)
+	add_keymap("K", Interactions.increase_window_height, "Increase chat height", window)
+	add_keymap("L", Interactions.decrease_window_width, "Decrease chat width", window)
+	add_keymap("J", Interactions.decrease_window_height, "Decrease chat height", window)
 end
 
 return Keymaps
