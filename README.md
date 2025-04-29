@@ -46,11 +46,10 @@ A plugin to interact with the openai API for Neovim
   - [x] model
   - [x] system message
   - [x] color
-- [ ] In visual mode, relay content to chat
+- [-] In visual mode, relay content to chat
   - [ ] opts for code-block types
 - [ ] Adjustable filter for messages
   - [ ] Move filtering into chat window
-  - [ ] Update window title accordingly
 - [ ] Conversation "Snippets" (see [./conversations-roadmap.md](./conversations-roadmap.md)):
   - Unnamed and unstructured conversations
   - Indexed by topics
@@ -69,11 +68,13 @@ A plugin to interact with the openai API for Neovim
 Lazy:
 
 ```lua
-
-{
+return {
   "niklaslorenz/code-assist.nvim",
+  dependencies = {
+    "nvim-lua/plenary.nvim",
+  },
   opts = {},
-  lazy = false,
+  events = { "VeryLazy" },
   branch = "dev",
 }
 ```

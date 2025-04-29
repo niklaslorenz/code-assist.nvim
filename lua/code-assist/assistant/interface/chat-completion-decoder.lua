@@ -20,47 +20,34 @@ end
 --- @param data any
 --- @return ChatCompletionChunk
 local function extract_chunk(data)
-	-- TODO: Use the Parsing.try_parse_array function
-	local choices_data = Parsing.try_get_optional("choices", "table", data)
 	--- @type ChatCompletionChunkChoice[]
-	local choices = {}
-
-	if choices_data then
-		for _, cd in ipairs(choices_data) do
-			local delta_data = Parsing.try_get("delta", "table", cd)
-			local tool_calls_data = Parsing.try_get_optional("tool_calls", "table", delta_data)
-			--- @type ChatCompletionChunkToolCall[]
-			local tool_calls = {}
-			if tool_calls_data then
-				for _, td in ipairs(tool_calls_data) do
-					--- @type ChatCompletionChunkToolCall
-					local tool_call = {
-						arguments = Parsing.try_get("arguments", "string", td),
-						id = Parsing.try_get("id", "string", td),
-						index = Parsing.try_get_number("index", "integer", td),
-						name = Parsing.try_get("name", "string", td),
-					}
-					table.insert(tool_calls, tool_call)
-				end
-			end
-
-			--- @type ChatCompletionChunkDelta
-			local delta = {
-				role = Parsing.try_get_optional("role", "string", delta_data),
-				content = Parsing.try_get_optional("content", "string", delta_data),
-				tool_calls = tool_calls,
-				refusal = Parsing.try_get_optional("refusal", "string", delta_data),
+	local choices = Parsing.parse_array("choices", "table", data, function(choice)
+		local delta_data = Parsing.try_get("delta", "table", choice)
+		local tool_calls = Parsing.parse_array("tool_calls", "table", choice, function(tool_call)
+			--- @type ChatCompletionChunkToolCall
+			local created = {
+				arguments = Parsing.try_get("arguments", "string", tool_call),
+				id = Parsing.try_get("id", "string", tool_call),
+				index = Parsing.try_get_number("index", "integer", tool_call),
+				name = Parsing.try_get("name", "string", tool_call),
 			}
-			--- @type ChatCompletionChunkChoice
-			local choice = {
-				index = Parsing.try_get_number("index", "integer", cd),
-				delta = delta,
-				finish_reason = Parsing.try_get_optional("finish_reason", "string", cd),
-			}
-			table.insert(choices, choice)
-		end
-	end
-
+			return created
+		end, true, true) or {} --[=[@as ChatCompletionChunkToolCall[]]=]
+		--- @type ChatCompletionChunkDelta
+		local delta = {
+			role = Parsing.try_get_optional("role", "string", delta_data),
+			content = Parsing.try_get_optional("content", "string", delta_data),
+			tool_calls = tool_calls,
+			refusal = Parsing.try_get_optional("refusal", "string", delta_data),
+		}
+		--- @type ChatCompletionChunkChoice
+		local created = {
+			index = Parsing.try_get_number("index", "integer", choice),
+			delta = delta,
+			finish_reason = Parsing.try_get_optional("finish_reason", "string", choice),
+		}
+		return created
+	end, true, true) or {} --[=[@as ChatCompletionChunkChoice[]]=]
 	--- @type ChatCompletionChunk
 	local chunk = {
 		choices = choices,
