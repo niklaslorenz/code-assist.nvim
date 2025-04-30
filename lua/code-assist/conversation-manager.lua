@@ -59,7 +59,7 @@ function ConversationManager.list_conversations(sorting)
 
 	for _, file in ipairs(files) do
 		if file:match("%.json$") then
-			local name = file:sub(1, -6)                         -- remove the .json extension
+			local name = file:sub(1, -6) -- remove the .json extension
 			local mtime = vim.fn.getftime(conv_path .. "/" .. file) -- get the modification time
 			table.insert(convs, { name = name, mtime = mtime })
 		end
@@ -375,6 +375,7 @@ function ConversationManager.generate_streaming_response(on_finish)
 			for _, chunk in pairs(chunks) do
 				if chunk.choices[1] then
 					local delta = chunk.choices[1].delta
+					assert(delta)
 					if not delta.role then
 						if delta.content then
 							if current_delta_msg then
@@ -415,10 +416,10 @@ function ConversationManager.generate_streaming_response(on_finish)
 end
 
 --- @type EventDispatcher<MessageExtendEvent>
-ConversationManager.on_message_extend = EventDispatcher.new()
+ConversationManager.on_message_extend = EventDispatcher:new()
 --- @type EventDispatcher<NewMessageEvent>
-ConversationManager.on_new_message = EventDispatcher.new()
+ConversationManager.on_new_message = EventDispatcher:new()
 --- @type EventDispatcher<ConversationSwitchEvent>
-ConversationManager.on_conversation_switch = EventDispatcher.new()
+ConversationManager.on_conversation_switch = EventDispatcher:new()
 
 return ConversationManager

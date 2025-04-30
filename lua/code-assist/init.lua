@@ -29,7 +29,7 @@ function M.setup(opts)
 	Keymaps.setup_global_keymaps()
 
 	ChatWindow.on_visibility_change:subscribe(function(event)
-		if event == "show" then
+		if event == "visible" then
 			Keymaps.setup_chat_buffer_keymaps(ChatWindow.get_chat_buf())
 			if not ConversationManager.has_conversation() then
 				ConversationManager.load_last_or_create_new()

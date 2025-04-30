@@ -194,7 +194,7 @@ function ChatWindow.hide()
 		return
 	end
 	vim.api.nvim_win_close(win, true)
-	ChatWindow.on_visibility_change:dispatch("hide")
+	ChatWindow.on_visibility_change:dispatch("hidden")
 end
 
 --- Show the chat window.
@@ -246,7 +246,7 @@ function ChatWindow.open(orientation)
 	vim.wo[win].wrap = true
 	vim.wo[win].linebreak = true
 	vim.api.nvim_win_set_buf(win, chat_buf)
-	ChatWindow.on_visibility_change:dispatch("show")
+	ChatWindow.on_visibility_change:dispatch("visible")
 end
 
 function ChatWindow.increase_window_width()
@@ -297,7 +297,7 @@ function ChatWindow.decrease_window_height()
 	vim.api.nvim_win_set_config(win, config)
 end
 
---- @type EventDispatcher<WindowDisplayEvent>
-ChatWindow.on_visibility_change = EventDispatcher.new()
+--- @type EventDispatcher<WindowStatus>
+ChatWindow.on_visibility_change = EventDispatcher:new()
 
 return ChatWindow

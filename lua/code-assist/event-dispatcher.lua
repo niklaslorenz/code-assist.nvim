@@ -8,9 +8,9 @@ EventDispatcher.__index = EventDispatcher
 
 --- @generic T
 --- @return EventDispatcher<T>
-function EventDispatcher.new()
+function EventDispatcher:new()
 	local obj = { _subscribers = {} }
-	setmetatable(obj, EventDispatcher)
+	setmetatable(obj, self)
 	return obj
 end
 

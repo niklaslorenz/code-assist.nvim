@@ -32,8 +32,14 @@ end
 function Keymaps.setup_global_keymaps()
 	add_keymap("<leader>a", nil, "🗨 Code Assist")
 	add_keymap("<leader>aq", Interactions.close_chat_window, "Close chat window", nil, { "n", "v" })
-	add_keymap("<leader>aN", Interactions.create_new_listed_conversation, "New listed conv.", nil, { "n", "v" })
-	add_keymap("<leader>an", Interactions.create_new_unlisted_conversation, "New unlisted conv.", nil, { "n", "v" })
+	add_keymap("<leader>aN", Interactions.create_new_listed_conversation, "New listed conversation", nil, { "n", "v" })
+	add_keymap(
+		"<leader>an",
+		Interactions.create_new_unlisted_conversation,
+		"New unlisted conversation",
+		nil,
+		{ "n", "v" }
+	)
 	add_keymap("<leader>as", Interactions.open_select_window, "Select conversation", nil, { "n", "v" })
 	add_keymap("<leader>av", Interactions.open_vertical_split, "Open vertical split", nil, { "n", "v" })
 	add_keymap("<leader>ah", Interactions.open_horizontal_split, "Open horizontal split", nil, { "n", "v" })

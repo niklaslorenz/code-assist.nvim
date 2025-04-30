@@ -2,4 +2,8 @@
 
 --- @alias WindowOrientation "hsplit"|"vsplit"|"float"
 
---- @alias WindowDisplayEvent "show"|"hide"
+--- @alias WindowStatus "visible"|"hidden"
+
+--- @class ContentWindowItem
+--- @field content string
+--- @field channel string
