@@ -4,6 +4,12 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
+- [ ] Refactor Chat window
+  - [ ] Message Tracking
+- [ ] Message Input Window
+- [ ] Assistant basic threads
+- [ ] tool calls
+
 - [ ] Conversation length management
   - [ ] Conversation token length tracking
   - [ ] Make sure that the system message is not truncated
