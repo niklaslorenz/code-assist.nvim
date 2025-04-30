@@ -12,7 +12,13 @@
 --- @field name string
 --- @field arguments string
 
---- @class ChatCompletionChunkDelta
+--- @class ChatCompletionToolCall
+--- @field index integer
+--- @field id string
+--- @field name string
+--- @field arguments string
+
+--- @class ChatCompletionDelta
 --- @field content string?
 --- @field refusal string?
 --- @field role string?
@@ -21,7 +27,11 @@
 --- @class ChatCompletionChunkChoice
 --- @field index integer
 --- @field finish_reason string?
---- @field delta ChatCompletionChunkDelta
+--- @field delta ChatCompletionDelta?
+
+--- @class ChatCompletionUsage
+--- @field completion_tokens integer
+--- @field prompt_tokens integer
 
 --- @class ChatCompletionChunk
 --- @field id string
@@ -29,3 +39,4 @@
 --- @field created integer
 --- @field model string
 --- @field system_fingerprint string
+--- @field usage ChatCompletionUsage?

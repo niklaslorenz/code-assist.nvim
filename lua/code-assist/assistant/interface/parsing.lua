@@ -14,11 +14,11 @@ function Parsing.try_get_optional(name, expected_type, data)
 	if type(value) ~= expected_type then
 		error(
 			"Invalid property type for property "
-				.. name
-				.. ": Expected "
-				.. expected_type
-				.. " but got "
-				.. type(value)
+			.. name
+			.. ": Expected "
+			.. expected_type
+			.. " but got "
+			.. type(value)
 		)
 	end
 	return value
@@ -53,6 +53,19 @@ function Parsing.try_get_number(name, expected_type, data)
 	return value
 end
 
+function Parsing.try_parse_object(name, data, object_parser, allow_nil)
+	local object_data
+	if allow_nil then
+		object_data = Parsing.try_get_optional(name, "table", data)
+		if not object_data then
+			return nil
+		end
+	else
+		object_data = Parsing.try_get(name, "table", data)
+	end
+	return object_parser(object_data)
+end
+
 --- Try to parse an array of items.
 --- @param name string The name of the array
 --- @param expected_element_type string
@@ -60,17 +73,16 @@ end
 --- @param element_parser fun(element: unknown): unknown
 --- @param allow_empty boolean
 --- @param allow_nil boolean
---- @return unknown[]|nil result
-function Parsing.parse_array(name, expected_element_type, data, element_parser, allow_empty, allow_nil)
-	local array_value = data[name]
-	if not array_value or array_value == vim.NIL then
-		if allow_nil then
-			return nil
+--- @return unknown[] result
+function Parsing.try_parse_array(name, expected_element_type, data, element_parser, allow_empty, allow_nil)
+	local array_value
+	if allow_nil then
+		array_value = Parsing.try_get_optional(name, "table", data)
+		if not array_value then
+			return {}
 		end
-		error("Invalid nil value for array: " .. name)
-	end
-	if type(array_value) ~= "table" then
-		error("Invalid type for array " .. name .. ": Expected table but got " .. type(array_value))
+	else
+		array_value = Parsing.try_get(name, "table", data)
 	end
 	if #array_value == 0 then
 		if allow_empty then
@@ -83,11 +95,11 @@ function Parsing.parse_array(name, expected_element_type, data, element_parser, 
 		if type(value) ~= expected_element_type then
 			error(
 				"Invalid type for array element "
-					.. name
-					.. ": Expected "
-					.. expected_element_type
-					.. " but got "
-					.. type(value)
+				.. name
+				.. ": Expected "
+				.. expected_element_type
+				.. " but got "
+				.. type(value)
 			)
 		end
 		local parsed_value = element_parser(value)

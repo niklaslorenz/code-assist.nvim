@@ -3,6 +3,70 @@ local ChatCompletionDecoder = {}
 local Parsing = require("code-assist.assistant.interface.parsing")
 
 --- @param data any
+--- @return ChatCompletionToolCall tool_call
+local function decode_tool_call(data)
+	--- @type ChatCompletionToolCall
+	local tool_call = {
+		arguments = Parsing.try_get("arguments", "string", data),
+		id = Parsing.try_get("id", "string", data),
+		index = Parsing.try_get_number("index", "integer", data),
+		name = Parsing.try_get("name", "string", data),
+	}
+	return tool_call
+end
+
+--- @param data any|nil
+--- @return ChatCompletionDelta delta
+local function decode_delta(data)
+	--- @type ChatCompletionDelta
+	local delta = {
+		content = Parsing.try_get_optional("content", "string", data),
+		refusal = Parsing.try_get_optional("refusal", "string", data),
+		role = Parsing.try_get_optional("role", "string", data),
+		tool_calls = Parsing.try_parse_array("tool_calls", "table", data, decode_tool_call, true, true),
+	}
+	return delta
+end
+
+--- @param data any
+--- @return ChatCompletionChunkChoice choice
+local function decode_chunk_choice(data)
+	--- @type ChatCompletionChunkChoice
+	local choice = {
+		delta = Parsing.try_parse_object("delta", data, decode_delta, true),
+		index = Parsing.try_get_number("index", "integer", data),
+		finish_reason = Parsing.try_get_optional("finish_reason", "string", data),
+	}
+	return choice
+end
+
+--- @param data any
+--- @return ChatCompletionUsage
+local function decode_usage(data)
+	--- @type ChatCompletionUsage
+	local usage = {
+		completion_tokens = Parsing.try_get_number("completion_tokens", "integer", data),
+		prompt_tokens = Parsing.try_get_number("prompt_tokens", "integer", data),
+	}
+	return usage
+end
+
+--- @param data any
+--- @return ChatCompletionChunk chunk
+local function decode_chunk(data)
+	--- @type ChatCompletionChunk
+	local chunk = {
+		choices = Parsing.try_parse_array("choices", "table", data, decode_chunk_choice, true, true),
+		created = Parsing.try_get_number("created", "integer", data),
+		id = Parsing.try_get("id", "string", data),
+		model = Parsing.try_get("model", "string", data),
+		system_fingerprint = Parsing.try_get("system_fingerprint", "string", data),
+		usage = Parsing.try_parse_object("usage", data, decode_usage, true),
+	}
+	return chunk
+end
+
+--- @param data any
 --- @return Message
 function ChatCompletionDecoder.decode_chat_completion(data)
 	-- TODO: implement real decoding to return an entire chat completion
@@ -15,48 +79,6 @@ function ChatCompletionDecoder.decode_chat_completion(data)
 	else
 		error("Error parsing chat completion")
 	end
-end
-
---- @param data any
---- @return ChatCompletionChunk
-local function extract_chunk(data)
-	--- @type ChatCompletionChunkChoice[]
-	local choices = Parsing.parse_array("choices", "table", data, function(choice)
-		local delta_data = Parsing.try_get("delta", "table", choice)
-		local tool_calls = Parsing.parse_array("tool_calls", "table", choice, function(tool_call)
-			--- @type ChatCompletionChunkToolCall
-			local created = {
-				arguments = Parsing.try_get("arguments", "string", tool_call),
-				id = Parsing.try_get("id", "string", tool_call),
-				index = Parsing.try_get_number("index", "integer", tool_call),
-				name = Parsing.try_get("name", "string", tool_call),
-			}
-			return created
-		end, true, true) or {} --[=[@as ChatCompletionChunkToolCall[]]=]
-		--- @type ChatCompletionChunkDelta
-		local delta = {
-			role = Parsing.try_get_optional("role", "string", delta_data),
-			content = Parsing.try_get_optional("content", "string", delta_data),
-			tool_calls = tool_calls,
-			refusal = Parsing.try_get_optional("refusal", "string", delta_data),
-		}
-		--- @type ChatCompletionChunkChoice
-		local created = {
-			index = Parsing.try_get_number("index", "integer", choice),
-			delta = delta,
-			finish_reason = Parsing.try_get_optional("finish_reason", "string", choice),
-		}
-		return created
-	end, true, true) or {} --[=[@as ChatCompletionChunkChoice[]]=]
-	--- @type ChatCompletionChunk
-	local chunk = {
-		choices = choices,
-		created = Parsing.try_get_number("created", "integer", data),
-		id = Parsing.try_get("id", "string", data),
-		model = Parsing.try_get("model", "string", data),
-		system_fingerprint = Parsing.try_get("system_fingerprint", "string", data),
-	}
-	return chunk
 end
 
 --- @param line string
@@ -73,7 +95,7 @@ function ChatCompletionDecoder.decode_chat_completion_chunk(line)
 		return nil, true
 	end
 	local decoded = vim.fn.json_decode(data)
-	return extract_chunk(decoded), false
+	return decode_chunk(decoded), false
 end
 
 return ChatCompletionDecoder
