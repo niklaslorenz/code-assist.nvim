@@ -1,5 +1,6 @@
 local ChatWindowControl = {}
 
+local Keymaps = require("code-assist.control.keymaps")
 local ChatWindow = require("code-assist.ui.chat-window")
 local ConversationManager = require("code-assist.conversation-manager")
 
@@ -39,8 +40,20 @@ local function setup_conversation_manager_events()
 	end)
 end
 
+local function setup_chat_window_events()
+	ChatWindow.on_visibility_change:subscribe(function(event)
+		if event == "visible" then
+			Keymaps.setup_chat_buffer_keymaps(ChatWindow.get_chat_buf())
+			if not ConversationManager.has_conversation() then
+				ConversationManager.load_last_or_create_new()
+			end
+		end
+	end)
+end
+
 function ChatWindowControl.setup()
 	setup_conversation_manager_events()
+	setup_chat_window_events()
 end
 
 return ChatWindowControl
