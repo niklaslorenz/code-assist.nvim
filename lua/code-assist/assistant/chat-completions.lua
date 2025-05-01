@@ -1,7 +1,11 @@
 local ChatCompletions = {}
 
+local PluginOptions = require("code-assist.options")
 local ChatCompletionDecoder = require("code-assist.assistant.interface.chat-completion-decoder")
 local Curl = require("plenary.curl")
+
+local data_path = PluginOptions.data_path
+local temp_file = data_path .. "/cc-temp.json"
 
 local api_key = os.getenv("OPENAI_API_KEY")
 if not api_key then
@@ -68,6 +72,8 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 		stream = true,
 	})
 
+	vim.fn.writefile({ payload }, temp_file)
+
 	--- @type ChatCompletionResponseStatus
 	local status = {
 		chunks = {},
@@ -76,7 +82,7 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 	}
 
 	Curl.post("https://api.openai.com/v1/chat/completions", {
-		body = payload,
+		body = temp_file,
 		headers = {
 			["Content-Type"] = "application/json",
 			["Authorization"] = "Bearer " .. api_key,
@@ -91,7 +97,7 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 				return
 			end
 			local decode_ok, new_chunk_or_error_msg, new_complete =
-				pcall(ChatCompletionDecoder.decode_chat_completion_chunk, data)
+					pcall(ChatCompletionDecoder.decode_chat_completion_chunk, data)
 			if decode_ok then
 				local new_chunk = new_chunk_or_error_msg
 				if new_chunk then
@@ -120,6 +126,7 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 			end
 		end),
 	})
+
 	return status
 end
 
