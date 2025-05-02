@@ -1,8 +1,11 @@
 local Interactions = {}
 
-local ChatWindow = require("code-assist.ui.chat-window")
+local Windows = require("code-assist.ui.window-instances")
+
 local ConversationManager = require("code-assist.conversation-manager")
 local SelectWindow = require("code-assist.ui.select-window")
+
+local ChatWindow = Windows.Chat
 
 local function get_current_selection()
 	local mode = vim.fn.mode()
@@ -45,19 +48,19 @@ local function get_current_filetype()
 end
 
 function Interactions.open_floating_window()
-	ChatWindow.open("float")
+	ChatWindow:open("float")
 end
 
 function Interactions.open_vertical_split()
-	ChatWindow.open("vsplit")
+	ChatWindow:open("vsplit")
 end
 
 function Interactions.open_horizontal_split()
-	ChatWindow.open("hsplit")
+	ChatWindow:open("hsplit")
 end
 
 function Interactions.open()
-	ChatWindow.open()
+	ChatWindow:open()
 end
 
 function Interactions.open_select_window()
@@ -149,7 +152,7 @@ function Interactions.copy_selection()
 		role = "user",
 		content = content,
 	})
-	ChatWindow.scroll_to_bottom()
+	ChatWindow:scroll_to_bottom()
 	if ConversationManager.get_current_conversation().type ~= "unlisted" then
 		local ok, reason = ConversationManager.save_current_conversation()
 		if not ok then
@@ -159,7 +162,7 @@ function Interactions.copy_selection()
 end
 
 function Interactions.close_chat_window()
-	ChatWindow.hide()
+	ChatWindow:hide()
 end
 
 function Interactions.create_new_unlisted_conversation()
@@ -168,7 +171,7 @@ function Interactions.create_new_unlisted_conversation()
 		return
 	end
 	ConversationManager.new_unlisted_conversation()
-	ChatWindow.open()
+	ChatWindow:open()
 end
 
 function Interactions.create_new_listed_conversation()
@@ -184,7 +187,7 @@ function Interactions.create_new_listed_conversation()
 			input = nil
 		end
 		ConversationManager.new_listed_conversation(input)
-		ChatWindow.open()
+		ChatWindow:open()
 	end)
 end
 
@@ -284,23 +287,23 @@ function Interactions.generate_response()
 end
 
 function Interactions.scroll_to_bottom()
-	ChatWindow.scroll_to_bottom()
+	ChatWindow:scroll_to_bottom()
 end
 
 function Interactions.increase_window_width()
-	ChatWindow.increase_window_width()
+	ChatWindow:increase_window_width()
 end
 
 function Interactions.increase_window_height()
-	ChatWindow.increase_window_height()
+	ChatWindow:increase_window_height()
 end
 
 function Interactions.decrease_window_width()
-	ChatWindow.decrease_window_width()
+	ChatWindow:decrease_window_width()
 end
 
 function Interactions.decrease_window_height()
-	ChatWindow.decrease_window_height()
+	ChatWindow:decrease_window_height()
 end
 
 return Interactions

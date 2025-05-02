@@ -62,10 +62,10 @@ end
 
 --- @param model string
 --- @param messages Message[]
---- @param on_chunks_ready fun(status: ChatCompletionResponseStatus, new_chunks: ChatCompletionChunk[])
+--- @param on_chunk_ready fun(status: ChatCompletionResponseStatus, new_chunk: ChatCompletionChunk)
 --- @param on_finish? fun(status: ChatCompletionResponseStatus)
 --- @return ChatCompletionResponseStatus status
-function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready, on_finish)
+function ChatCompletions.post_streaming_request(model, messages, on_chunk_ready, on_finish)
 	local payload = vim.fn.json_encode({
 		model = model,
 		messages = messages,
@@ -102,12 +102,12 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunks_ready
 				local new_chunk = new_chunk_or_error_msg
 				if new_chunk then
 					table.insert(status.chunks, new_chunk)
+					local callback_ok, callback_error_msg = pcall(on_chunk_ready, status, new_chunk)
+					if not callback_ok then
+						vim.notify(callback_error_msg, vim.log.levels.ERROR)
+					end
 				end
 				status.complete = new_complete
-				local callback_ok, callback_error_msg = pcall(on_chunks_ready, status, { new_chunk })
-				if not callback_ok then
-					vim.notify(callback_error_msg, vim.log.levels.ERROR)
-				end
 			else
 				local error_msg = new_chunk_or_error_msg --[[@as string]]
 				vim.notify(error_msg, vim.log.levels.ERROR)

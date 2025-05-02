@@ -59,7 +59,7 @@ function ConversationManager.list_conversations(sorting)
 
 	for _, file in ipairs(files) do
 		if file:match("%.json$") then
-			local name = file:sub(1, -6) -- remove the .json extension
+			local name = file:sub(1, -6)                         -- remove the .json extension
 			local mtime = vim.fn.getftime(conv_path .. "/" .. file) -- get the modification time
 			table.insert(convs, { name = name, mtime = mtime })
 		end
@@ -359,6 +359,46 @@ function ConversationManager.generate_response(on_finish)
 	end)
 end
 
+local function create_update_timer(callback)
+	local timer, error_msg, err_name = vim.uv.new_timer()
+	if not timer then
+		error(err_name .. ": " .. error_msg)
+	end
+
+	local accumulator = nil
+	local updater = {}
+
+	function updater.append(content)
+		if accumulator then
+			accumulator = accumulator .. content
+		else
+			accumulator = content
+		end
+	end
+
+	function updater.stop()
+		timer:stop()
+		updater.commit()
+	end
+
+	function updater.commit()
+		if accumulator then
+			callback(accumulator)
+			accumulator = nil
+		end
+	end
+
+	local function on_timer_expired()
+		if accumulator then
+			updater.commit()
+		end
+	end
+
+	timer:start(250, 250, vim.schedule_wrap(on_timer_expired))
+
+	return updater
+end
+
 --- Generate a response and stream the result to the current conversation.
 --- # Preconditions:
 --- - `.is_ready() == true`
@@ -367,46 +407,36 @@ end
 function ConversationManager.generate_streaming_response(on_finish)
 	assert(ConversationManager.is_ready())
 	assert(current_conversation)
+
+	local updater = create_update_timer(function(accumulated_content)
+		local ok, reason = ConversationManager.extend_last_message(accumulated_content)
+		if not ok then
+			vim.notify("Error in comitting accumulated response: " .. reason, vim.log.levels.ERROR)
+		end
+	end)
+
 	local response_status = ChatCompletions.post_streaming_request(
 		model,
 		current_conversation.messages,
-		function(_, chunks)
-			local current_delta_msg = nil
-			for _, chunk in pairs(chunks) do
-				if chunk.choices[1] then
-					local delta = chunk.choices[1].delta
-					assert(delta)
-					if not delta.role then
-						if delta.content then
-							if current_delta_msg then
-								current_delta_msg = current_delta_msg .. delta.content
-							else
-								current_delta_msg = delta.content
-							end
-						end
-					else
-						if current_delta_msg then
-							local ok, reason = ConversationManager.extend_last_message(current_delta_msg)
-							if not ok then
-								vim.notify(reason or "Unknown error", vim.log.levels.WARN)
-							end
-							current_delta_msg = nil
-						end
-						ConversationManager.add_message({
-							role = delta.role,
-							content = delta.content or "",
-						})
+		function(_, chunk)
+			if #chunk.choices > 0 then
+				local delta = chunk.choices[1].delta
+				assert(delta)
+				if not delta.role then
+					if delta.content then
+						updater.append(delta.content)
 					end
-				end
-			end
-			if current_delta_msg then
-				local ok, reason = ConversationManager.extend_last_message(current_delta_msg)
-				if not ok then
-					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+				else
+					updater.commit()
+					ConversationManager.add_message({
+						role = delta.role,
+						content = delta.content,
+					})
 				end
 			end
 		end,
 		function(_)
+			updater.stop()
 			if on_finish then
 				on_finish(current_conversation)
 			end

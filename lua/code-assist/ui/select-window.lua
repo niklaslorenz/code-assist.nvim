@@ -1,8 +1,10 @@
 local SelectWindow = {}
 
 local ConversationManager = require("code-assist.conversation-manager")
-local ChatWindow = require("code-assist.ui.chat-window")
+local Windows = require("code-assist.ui.window-instances")
 local Options = require("code-assist.options")
+
+local ChatWindow = Windows.Chat
 
 --- @type integer | nil
 local select_win = nil
@@ -44,7 +46,7 @@ local function select_hovered()
 	local success = ConversationManager.load_conversation(name)
 	if success then
 		SelectWindow.close()
-		ChatWindow.open()
+		ChatWindow:open()
 	else
 		vim.notify("Failed to load conversation: " .. name, vim.log.levels.ERROR)
 	end
