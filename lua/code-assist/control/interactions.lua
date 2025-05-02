@@ -48,19 +48,19 @@ local function get_current_filetype()
 end
 
 function Interactions.open_floating_window()
-	ChatWindow:open("float")
+	ChatWindow:show("float")
 end
 
 function Interactions.open_vertical_split()
-	ChatWindow:open("vsplit")
+	ChatWindow:show("vsplit")
 end
 
 function Interactions.open_horizontal_split()
-	ChatWindow:open("hsplit")
+	ChatWindow:show("hsplit")
 end
 
 function Interactions.open()
-	ChatWindow:open()
+	ChatWindow:show()
 end
 
 function Interactions.open_select_window()
@@ -171,7 +171,7 @@ function Interactions.create_new_unlisted_conversation()
 		return
 	end
 	ConversationManager.new_unlisted_conversation()
-	ChatWindow:open()
+	ChatWindow:show()
 end
 
 function Interactions.create_new_listed_conversation()
@@ -187,7 +187,7 @@ function Interactions.create_new_listed_conversation()
 			input = nil
 		end
 		ConversationManager.new_listed_conversation(input)
-		ChatWindow:open()
+		ChatWindow:show()
 	end)
 end
 

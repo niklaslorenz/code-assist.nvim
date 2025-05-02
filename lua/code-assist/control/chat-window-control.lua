@@ -70,7 +70,7 @@ local function setup_conversation_manager_events()
 end
 
 local function setup_chat_window_events()
-	ChatWindow.on_status_change:subscribe(function(event)
+	ChatWindow.on_visibility_change:subscribe(function(event)
 		if event == "visible" then
 			Keymaps.setup_chat_buffer_keymaps(ChatWindow:get_buf())
 			if not ConversationManager.has_conversation() then
