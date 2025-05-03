@@ -1,11 +1,9 @@
 local Interactions = {}
 
+local Options = require("code-assist.options")
 local Windows = require("code-assist.ui.window-instances")
-
 local ConversationManager = require("code-assist.conversation-manager")
 local SelectWindow = require("code-assist.ui.select-window")
-
-local ChatWindow = Windows.Chat
 
 local function get_current_selection()
 	local mode = vim.fn.mode()
@@ -48,19 +46,30 @@ local function get_current_filetype()
 end
 
 function Interactions.open_floating_window()
-	ChatWindow:show("float")
+	Windows.Chat:show({
+		orientation = "float",
+	})
 end
 
 function Interactions.open_vertical_split()
-	ChatWindow:show("vsplit")
+	Windows.Chat:show({
+		orientation = "vsplit",
+		relative_width = Options.relative_chat_width,
+	})
 end
 
 function Interactions.open_horizontal_split()
-	ChatWindow:show("hsplit")
+	Windows.Chat:show({
+		orientation = "hsplit",
+		relative_height = Options.relative_chat_height,
+	})
 end
 
 function Interactions.open()
-	ChatWindow:show()
+	Windows.Chat:show({
+		relative_height = Options.relative_chat_height,
+		relative_width = Options.relative_chat_width,
+	})
 end
 
 function Interactions.open_select_window()
@@ -152,7 +161,7 @@ function Interactions.copy_selection()
 		role = "user",
 		content = content,
 	})
-	ChatWindow:scroll_to_bottom()
+	Windows.Chat:scroll_to_bottom()
 	if ConversationManager.get_current_conversation().type ~= "unlisted" then
 		local ok, reason = ConversationManager.save_current_conversation()
 		if not ok then
@@ -162,7 +171,7 @@ function Interactions.copy_selection()
 end
 
 function Interactions.close_chat_window()
-	ChatWindow:hide()
+	Windows.Chat:hide()
 end
 
 function Interactions.create_new_unlisted_conversation()
@@ -171,7 +180,7 @@ function Interactions.create_new_unlisted_conversation()
 		return
 	end
 	ConversationManager.new_unlisted_conversation()
-	ChatWindow:show()
+	Windows.Chat:show()
 end
 
 function Interactions.create_new_listed_conversation()
@@ -187,7 +196,7 @@ function Interactions.create_new_listed_conversation()
 			input = nil
 		end
 		ConversationManager.new_listed_conversation(input)
-		ChatWindow:show()
+		Windows.Chat:show()
 	end)
 end
 
@@ -287,23 +296,7 @@ function Interactions.generate_response()
 end
 
 function Interactions.scroll_to_bottom()
-	ChatWindow:scroll_to_bottom()
-end
-
-function Interactions.increase_window_width()
-	ChatWindow:increase_window_width()
-end
-
-function Interactions.increase_window_height()
-	ChatWindow:increase_window_height()
-end
-
-function Interactions.decrease_window_width()
-	ChatWindow:decrease_window_width()
-end
-
-function Interactions.decrease_window_height()
-	ChatWindow:decrease_window_height()
+	Windows.Chat:scroll_to_bottom()
 end
 
 return Interactions

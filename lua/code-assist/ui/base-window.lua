@@ -1,18 +1,25 @@
 local EventDispatcher = require("code-assist.event-dispatcher")
 
+--- @class WindowShowOptions
+--- @field relative_width number?
+--- @field relative_height number?
+--- @field origin integer|BaseWindow?
+--- @field orientation WindowOrientation?
+
 --- @class BaseWindow
 --- @field new fun(win: BaseWindow, orientation: WindowOrientation?): BaseWindow
 --- @field get_win fun(win: BaseWindow): integer?
 --- @field get_buf fun(win: BaseWindow): integer
+--- @field get_orientation fun(win: BaseWindow): WindowOrientation
 --- @field is_visible fun(win: ContentWindow): boolean
 --- @field set_title fun(win: BaseWindow, title: string?)
---- @field show fun(win: BaseWindow, orientation: WindowOrientation?)
+--- @field show fun(win: BaseWindow, opts: WindowShowOptions?)
 --- @field hide fun(win: BaseWindow)
 --- @field scroll_to_bottom fun(win: BaseWindow)
---- @field increase_window_width fun(win: ContentWindow)
---- @field decrease_window_width fun(win: ContentWindow)
---- @field increase_window_height fun(win: ContentWindow)
---- @field decrease_window_height fun(win: ContentWindow)
+--- @field increase_window_width fun(win: BaseWindow)
+--- @field decrease_window_width fun(win: BaseWindow)
+--- @field increase_window_height fun(win: BaseWindow)
+--- @field decrease_window_height fun(win: BaseWindow)
 --- @field on_visibility_change EventDispatcher<WindowStatus>
 --- @field private _buf_id integer
 --- @field private _win_id integer?
@@ -49,6 +56,10 @@ function BaseWindow:get_buf()
 	return self._buf_id
 end
 
+function BaseWindow:get_orientation()
+	return self._orientation
+end
+
 function BaseWindow:is_visible()
 	return self:get_win() ~= nil
 end
@@ -64,11 +75,24 @@ function BaseWindow:set_title(title)
 	end
 end
 
-function BaseWindow:show(orientation)
+function BaseWindow:show(opts)
 	local win = self:get_win()
+	if not opts then
+		opts = {}
+	end
+
+	local origin_window = opts.origin
+	if origin_window ~= nil then
+		if type(origin_window) ~= "number" then
+			origin_window = origin_window --[[@as BaseWindow]]:get_win()
+		end
+	end
+
+	local orientation = opts.orientation
 	if not orientation then
 		orientation = self._orientation
 	end
+
 	if win then
 		if orientation == self._orientation then
 			vim.api.nvim_set_current_win(win)
@@ -79,14 +103,26 @@ function BaseWindow:show(orientation)
 	end
 
 	if orientation == "hsplit" then
+		local height
+		if opts.relative_height then
+			height = math.floor(opts.relative_height * vim.api.nvim_win_get_height(origin_window or 0))
+		end
 		self._win_id = vim.api.nvim_open_win(self._buf_id, true, {
 			vertical = false,
-			split = "bottom",
+			split = "below",
+			height = height,
+			win = origin_window,
 		})
 	elseif orientation == "vsplit" then
+		local width
+		if opts.relative_width then
+			width = math.floor(opts.relative_width * vim.api.nvim_win_get_width(origin_window or 0))
+		end
 		self._win_id = vim.api.nvim_open_win(self._buf_id, true, {
 			vertical = true,
 			split = "right",
+			width = width,
+			win = origin_window,
 		})
 	else
 		local w = math.floor(vim.o.columns * 0.6)

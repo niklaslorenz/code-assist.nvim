@@ -23,7 +23,7 @@ setmetatable(ContentWindow, BaseWindow)
 
 function ContentWindow:new(orientation)
 	--- @type ContentWindow
-	local win = BaseWindow.new(ContentWindow, orientation) --[[@as ContentWindow]]
+	local win = BaseWindow.new(self, orientation) --[[@as ContentWindow]]
 	win._content = {}
 	win._line_count = 0
 	local buf = win:get_buf()

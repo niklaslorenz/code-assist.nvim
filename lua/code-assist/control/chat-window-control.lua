@@ -1,5 +1,6 @@
 local ChatWindowControl = {}
 
+local Options = require("code-assist.options")
 local Keymaps = require("code-assist.control.keymaps")
 local Windows = require("code-assist.ui.window-instances")
 local ConversationManager = require("code-assist.conversation-manager")
@@ -41,6 +42,11 @@ local function parse_item(item)
 	return window_item
 end
 
+local function setup_window_keymaps()
+	Keymaps.setup_chat_buffer_keymaps(Windows.Chat:get_buf())
+	Keymaps.setup_chat_input_buffer_keymaps(Windows.ChatInput:get_buf())
+end
+
 local function setup_conversation_manager_events()
 	ConversationManager.on_conversation_switch:subscribe(function(event)
 		local messages = event.conversation ~= nil and event.conversation.messages or {}
@@ -70,17 +76,71 @@ local function setup_conversation_manager_events()
 end
 
 local function setup_chat_window_events()
-	ChatWindow.on_visibility_change:subscribe(function(event)
+	Windows.Chat.on_visibility_change:subscribe(function(event)
 		if event == "visible" then
-			Keymaps.setup_chat_buffer_keymaps(ChatWindow:get_buf())
+			local win = Windows.Chat:get_win()
+			assert(win)
+			vim.wo[win].wrap = true
 			if not ConversationManager.has_conversation() then
 				ConversationManager.load_last_or_create_new()
 			end
 		end
 	end)
+
+	Windows.Chat.on_visibility_change:subscribe(function(event)
+		if event == "visible" then
+			local orientation = Windows.Chat:get_orientation()
+			if orientation == "hsplit" then
+				Windows.ChatInput:show({
+					orientation = "vsplit",
+					origin = Windows.Chat,
+					relative_width = Options.relative_chat_input_width,
+				})
+			elseif orientation == "vsplit" then
+				Windows.ChatInput:show({
+					orientation = "hsplit",
+					origin = Windows.Chat,
+					relative_height = Options.relative_chat_input_height,
+				})
+			else
+				Windows.ChatInput:hide()
+			end
+		else
+			Windows.ChatInput:hide()
+		end
+	end)
+
+	Windows.ChatInput.on_visibility_change:subscribe(function(event)
+		if event == "visible" then
+			local win = Windows.ChatInput:get_win()
+			assert(win)
+			vim.wo[win].wrap = true
+		end
+	end)
+
+	Windows.ChatInput.on_submit:subscribe(function(event)
+		if not ConversationManager.is_ready() then
+			vim.notify("Conversation Manager not ready", vim.log.levels.INFO)
+			return
+		end
+		if not ConversationManager.has_conversation() then
+			vim.notify("No current conversation", vim.log.levels.INFO)
+		end
+		Windows.ChatInput:clear()
+		ConversationManager.add_message({ role = "user", content = event })
+		ConversationManager.generate_streaming_response(function(conversation)
+			if conversation.type ~= "unlisted" then
+				local ok, reason = ConversationManager.save_current_conversation()
+				if not ok then
+					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
+				end
+			end
+		end)
+	end)
 end
 
 function ChatWindowControl.setup()
+	setup_window_keymaps()
 	setup_conversation_manager_events()
 	setup_chat_window_events()
 end

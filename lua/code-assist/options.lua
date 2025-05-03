@@ -16,6 +16,14 @@ local Options = {
 	default_window_orientation = "float",
 	--- @type integer?
 	max_context_length = nil,
+	--- @type number
+	relative_chat_height = 0.3,
+	--- @type number
+	relative_chat_width = 0.3,
+	--- @type number
+	relative_chat_input_height = 0.3,
+	--- @type number
+	relative_chat_input_width = 0.3,
 }
 
 return Options

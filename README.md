@@ -4,11 +4,12 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
-- [ ] Refactor Chat window
-  - [ ] Message Tracking
-- [ ] Message Input Window
+- [x] Refactor Chat window
+  - [x] Message Tracking
+- [x] Message Input Window
 - [ ] Assistant basic threads
 - [ ] tool calls
+- [ ] Refactor Select Window
 
 - [ ] Conversation length management
   - [ ] Conversation token length tracking
@@ -36,12 +37,11 @@ A plugin to interact with the openai API for Neovim
   - Goals?
 - [ ] (Refatoring) Cleanup chat-window-control
 - [x] Chat Window Title
-- [ ] Multi Line Inputs
+- [x] Multi Line Inputs
 - [-] Keymaps
   - [x] leader + a + b -> scroll to bottom
   - [ ] Previous and next message start/end with \[c, \[C \]c \]C
     - needs message tracking
-  - [ ] help (?) for every window / keymap descriptions
   - [x] Rename conversation from chat window
   - [x] Delete conversation from chat window
   - [x] Select conversation from chat window
