@@ -1,5 +1,9 @@
 local EventDispatcher = require("code-assist.event-dispatcher")
 
+--- @alias WindowOrientation "hsplit"|"vsplit"|"float"
+
+--- @alias WindowStatus "visible"|"hidden"
+
 --- @class WindowShowOptions
 --- @field relative_width number?
 --- @field relative_height number?

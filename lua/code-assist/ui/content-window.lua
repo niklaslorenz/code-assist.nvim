@@ -1,5 +1,9 @@
 local BaseWindow = require("code-assist.ui.base-window")
 
+--- @class ContentWindowItem
+--- @field content string
+--- @field channel string
+
 --- @class ContentWindowItemInternal
 --- @field content_lines string[]
 --- @field channel string
