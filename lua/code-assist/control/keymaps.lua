@@ -30,23 +30,6 @@ local function add_keymap(key, func, description, buf, mode)
 	end
 end
 
---- @param window BaseWindow
-local function setup_window_size_keymaps(window)
-	local buffer = window:get_buf()
-	add_keymap("H", function()
-		window:increase_window_width()
-	end, "Increase chat width", buffer)
-	add_keymap("K", function()
-		window:increase_window_height()
-	end, "Increase chat height", buffer)
-	add_keymap("L", function()
-		window:decrease_window_width()
-	end, "Decrease chat width", buffer)
-	add_keymap("J", function()
-		window:decrease_window_height()
-	end, "Decrease chat height", buffer)
-end
-
 function Keymaps.setup_global_keymaps()
 	add_keymap("<leader>a", nil, "🗨 Code Assist")
 	add_keymap("<leader>aq", Interactions.close_chat_window, "Close chat window", nil, { "n", "v" })
@@ -83,7 +66,6 @@ function Keymaps.setup_chat_buffer_keymaps(buffer)
 	add_keymap("<leader>adc", Interactions.delete_current_conversation, "Delete conversation", buffer)
 	add_keymap("<leader>adm", Interactions.delete_last_message, "Delete last message", buffer)
 	add_keymap("<leader>ag", Interactions.generate_response, "Generate response", buffer)
-	setup_window_size_keymaps(Windows.Chat)
 end
 
 --- @param buffer integer buffer index
@@ -92,7 +74,6 @@ function Keymaps.setup_chat_input_buffer_keymaps(buffer)
 	add_keymap("<CR><CR>", function()
 		Windows.ChatInput:commit()
 	end, "Commit chat input", buffer, { "n", "v", "i" })
-	setup_window_size_keymaps(Windows.ChatInput)
 end
 
 return Keymaps
