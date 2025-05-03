@@ -73,8 +73,8 @@ function BaseWindow:set_title(title)
 	local win = self:get_win()
 	if win and self._orientation == "float" then
 		local config = vim.api.nvim_win_get_config(win)
-		config.title = title
-		config.title_pos = "center"
+		config.title = title or ""
+		config.title_pos = title ~= nil and "center" or nil
 		vim.api.nvim_win_set_config(win, config)
 	end
 end

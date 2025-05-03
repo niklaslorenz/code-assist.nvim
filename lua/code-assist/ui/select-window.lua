@@ -46,7 +46,7 @@ local function select_hovered()
 	local success = ConversationManager.load_conversation(name)
 	if success then
 		SelectWindow.close()
-		ChatWindow:open()
+		ChatWindow:show()
 	else
 		vim.notify("Failed to load conversation: " .. name, vim.log.levels.ERROR)
 	end
