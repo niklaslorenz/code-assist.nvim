@@ -299,4 +299,12 @@ function Interactions.scroll_to_bottom()
 	Windows.Chat:scroll_to_bottom()
 end
 
+function Interactions.scroll_to_next_begin()
+	Windows.Chat:scroll_to_next_item(true)
+end
+
+function Interactions.scroll_to_previous_begin()
+	Windows.Chat:scroll_to_previous_item(true)
+end
+
 return Interactions

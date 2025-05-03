@@ -66,6 +66,8 @@ function Keymaps.setup_chat_buffer_keymaps(buffer)
 	add_keymap("<leader>adc", Interactions.delete_current_conversation, "Delete conversation", buffer)
 	add_keymap("<leader>adm", Interactions.delete_last_message, "Delete last message", buffer)
 	add_keymap("<leader>ag", Interactions.generate_response, "Generate response", buffer)
+	add_keymap("[c", Interactions.scroll_to_previous_begin, "previous message begin", buffer)
+	add_keymap("]c", Interactions.scroll_to_next_begin, "next message begin", buffer)
 end
 
 --- @param buffer integer buffer index
@@ -73,6 +75,7 @@ function Keymaps.setup_chat_input_buffer_keymaps(buffer)
 	add_keymap("q", Interactions.close_chat_window, "Close chat window", buffer)
 	add_keymap("<CR><CR>", function()
 		Windows.ChatInput:commit()
+		Windows.Chat:scroll_to_bottom()
 	end, "Commit chat input", buffer, { "n", "v", "i" })
 end
 

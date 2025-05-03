@@ -19,6 +19,9 @@ local BaseWindow = require("code-assist.ui.base-window")
 --- @field append_to_last_item fun(win: ContentWindow, content: string)
 --- @field refresh fun(win: ContentWindow)
 --- @field clear fun(win: ContentWindow)
+--- @field scroll_to_previous_item fun(win: ContentWindow, begin: boolean)
+--- @field scroll_to_next_item fun(win: ContentWindow, begin: boolean)
+--- @field private _find_item_index fun(win: ContentWindow, line: integer): integer
 --- @field private _content ContentWindowItemInternal[]
 --- @field private _line_count integer
 local ContentWindow = {}
@@ -150,6 +153,61 @@ function ContentWindow:clear()
 	vim.bo[buf].modifiable = false
 	self._content = {}
 	self._line_count = 0
+end
+
+function ContentWindow:scroll_to_previous_item(begin)
+	local win = self:get_win()
+	assert(win)
+	local current_line = vim.api.nvim_win_get_cursor(win)[1] - 1
+	local item_index = self:_find_item_index(current_line)
+	print("scroll previous")
+	print("current line: " .. current_line)
+	print("current item: " .. item_index)
+	if item_index == 0 then
+		vim.notify("Invalid item index", vim.log.levels.ERROR)
+		return
+	elseif item_index == 1 then
+		vim.api.nvim_win_set_cursor(win, { 1, 0 })
+	else
+		local target_item = self._content[item_index - 1]
+		local newline = begin and target_item.start_line or target_item.end_line
+		vim.api.nvim_win_set_cursor(win, { newline + 1, 0 })
+	end
+end
+
+function ContentWindow:scroll_to_next_item(begin)
+	local win = self:get_win()
+	assert(win)
+	local current_line = vim.api.nvim_win_get_cursor(win)[1] - 1
+	local item_index = self:_find_item_index(current_line)
+	print("scroll next")
+	print("current line: " .. current_line)
+	print("current item: " .. item_index)
+	if item_index == 0 then
+		return
+	elseif item_index == #self._content then
+		vim.api.nvim_win_set_cursor(win, { self._line_count + 1, 0 })
+	else
+		local target_item = self._content[item_index + 1]
+		local newline = begin and target_item.start_line or target_item.end_line
+		vim.api.nvim_win_set_cursor(win, { newline + 1, 0 })
+	end
+end
+
+function ContentWindow:_find_item_index(line)
+	if #self._content == 0 then
+		return 0
+	end
+	if line >= self._line_count then
+		return #self._content
+	end
+	for i = #self._content, 1, -1 do
+		local item = self._content[i]
+		if item.start_line <= line then
+			return i
+		end
+	end
+	error("Should not be reached")
 end
 
 return ContentWindow

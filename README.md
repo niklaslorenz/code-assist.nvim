@@ -40,7 +40,7 @@ A plugin to interact with the openai API for Neovim
 - [x] Multi Line Inputs
 - [-] Keymaps
   - [x] leader + a + b -> scroll to bottom
-  - [ ] Previous and next message start/end with \[c, \[C \]c \]C
+  - [x] Previous and next message start/end with \[c, \[C \]c \]C
     - needs message tracking
   - [x] Rename conversation from chat window
   - [x] Delete conversation from chat window
