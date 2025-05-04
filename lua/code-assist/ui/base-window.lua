@@ -21,10 +21,6 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field show fun(win: BaseWindow, opts: WindowShowOptions?)
 --- @field hide fun(win: BaseWindow)
 --- @field scroll_to_bottom fun(win: BaseWindow)
---- @field increase_window_width fun(win: BaseWindow)
---- @field decrease_window_width fun(win: BaseWindow)
---- @field increase_window_height fun(win: BaseWindow)
---- @field decrease_window_height fun(win: BaseWindow)
 --- @field on_visibility_change EventDispatcher<WindowStatus>
 --- @field private _buf_id integer
 --- @field private _win_id integer?
@@ -88,21 +84,15 @@ function BaseWindow:set_title(title)
 end
 
 function BaseWindow:show(opts)
+	opts = opts or {}
 	local win = self:get_win()
-	if not opts then
-		opts = {}
-	end
+	local orientation = opts.orientation or self._orientation
 
 	local origin_window = opts.origin
 	if origin_window ~= nil then
 		if type(origin_window) ~= "number" then
 			origin_window = origin_window --[[@as BaseWindow]]:get_win()
 		end
-	end
-
-	local orientation = opts.orientation
-	if not orientation then
-		orientation = self._orientation
 	end
 
 	if win then
@@ -176,55 +166,7 @@ function BaseWindow:scroll_to_bottom()
 	local win = self:get_win()
 	assert(win)
 	local line_count = vim.api.nvim_buf_line_count(self._buf_id)
-	vim.api.nvim_win_set_cursor(win, { line_count - 1, 0 })
-end
-
-function BaseWindow:increase_window_width()
-	local win = self:get_win()
-	if not win then
-		return
-	end
-	local config = vim.api.nvim_win_get_config(win)
-	if config.width then
-		config.width = config.width + 10
-	end
-	vim.api.nvim_win_set_config(win, config)
-end
-
-function BaseWindow:increase_window_height()
-	local win = self:get_win()
-	if not win then
-		return
-	end
-	local config = vim.api.nvim_win_get_config(win)
-	if config.height then
-		config.height = config.height + 5
-	end
-	vim.api.nvim_win_set_config(win, config)
-end
-
-function BaseWindow:decrease_window_width()
-	local win = self:get_win()
-	if not win then
-		return
-	end
-	local config = vim.api.nvim_win_get_config(win)
-	if config.width then
-		config.width = config.width - 10
-	end
-	vim.api.nvim_win_set_config(win, config)
-end
-
-function BaseWindow:decrease_window_height()
-	local win = self:get_win()
-	if not win then
-		return
-	end
-	local config = vim.api.nvim_win_get_config(win)
-	if config.height then
-		config.height = config.height - 5
-	end
-	vim.api.nvim_win_set_config(win, config)
+	vim.api.nvim_win_set_cursor(win, { line_count, 0 })
 end
 
 return BaseWindow
