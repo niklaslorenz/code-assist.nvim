@@ -12,10 +12,11 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 
 --- @class BaseWindow
 --- @field new fun(win: BaseWindow, orientation: WindowOrientation?): BaseWindow
+--- @field dispose fun(win: BaseWindow)
 --- @field get_win fun(win: BaseWindow): integer?
 --- @field get_buf fun(win: BaseWindow): integer
 --- @field get_orientation fun(win: BaseWindow): WindowOrientation
---- @field is_visible fun(win: ContentWindow): boolean
+--- @field is_visible fun(win: BaseWindow): boolean
 --- @field set_title fun(win: BaseWindow, title: string?)
 --- @field show fun(win: BaseWindow, opts: WindowShowOptions?)
 --- @field hide fun(win: BaseWindow)
@@ -47,6 +48,13 @@ function BaseWindow:new(orientation)
 	vim.bo[new._buf_id].swapfile = false
 	setmetatable(new, self)
 	return new
+end
+
+function BaseWindow:dispose()
+	if self:is_visible() then
+		self:hide()
+	end
+	vim.api.nvim_buf_delete(self._buf_id, { force = true })
 end
 
 function BaseWindow:get_win()

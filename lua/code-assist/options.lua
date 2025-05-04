@@ -1,28 +1,27 @@
---- @class CodeAssistOptions
+--- @class CodeAssistOptions?
+--- @field model string?
+--- @field system_message string?
+--- @field user_chat_color string?
+--- @field assistant_chat_color string?
+--- @field data_path string?
+--- @field default_sort_order string?
+--- @field max_context_length integer?
+--- @field relative_chat_height number?
+--- @field relative_chat_width number?
+--- @field relative_chat_input_width number?
+--- @field relative_chat_input_height number?
 local Options = {
-	--- @type string
 	model = "gpt-4o-mini",
-	--- @type string
 	system_message = "You are a helpful programming assistant.",
-	--- @type string
 	user_chat_color = "#a3be8c",
-	--- @type string
 	assistant_chat_color = "#88c0d0",
-	--- @type string
 	data_path = vim.fn.stdpath("data") .. "/code-assist",
-	--- @type string
 	default_sort_order = "last",
-	--- @type WindowOrientation
 	default_window_orientation = "float",
-	--- @type integer?
 	max_context_length = nil,
-	--- @type number
 	relative_chat_height = 0.3,
-	--- @type number
 	relative_chat_width = 0.3,
-	--- @type number
 	relative_chat_input_height = 0.3,
-	--- @type number
 	relative_chat_input_width = 0.3,
 }
 

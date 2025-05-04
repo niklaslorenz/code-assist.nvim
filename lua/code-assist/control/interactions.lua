@@ -1,5 +1,6 @@
 local Interactions = {}
 
+local OptionsWindow = require("code-assist.ui.options-window")
 local Options = require("code-assist.options")
 local Windows = require("code-assist.ui.window-instances")
 local ConversationManager = require("code-assist.conversation-manager")
@@ -305,6 +306,16 @@ end
 
 function Interactions.scroll_to_previous_begin()
 	Windows.Chat:scroll_to_previous_item(true)
+end
+
+function Interactions.open_chat_filter_window()
+	local win = OptionsWindow:new(Windows.Chat:get_filters(), "*Chat Channels:*", "float")
+	win.on_submit:subscribe(function(event)
+		for k, v in pairs(event) do
+			Windows.Chat:set_filter(k, v)
+		end
+	end)
+	win:show()
 end
 
 return Interactions

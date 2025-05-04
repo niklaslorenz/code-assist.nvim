@@ -4,12 +4,16 @@ A plugin to interact with the openai API for Neovim
 
 ## TODO
 
+Roadmap:
+
 - [x] Refactor Chat window
   - [x] Message Tracking
 - [x] Message Input Window
 - [ ] Assistant basic threads
 - [ ] tool calls
 - [ ] Refactor Select Window
+
+Bucket List:
 
 - [ ] Conversation length management
   - [ ] Conversation token length tracking
@@ -25,7 +29,7 @@ A plugin to interact with the openai API for Neovim
 - [x] Conversation sorting in selection screen
   - [x] keymap with o-<sort order key>
   - [x] plugin opt for default sorting order
-- [ ] Dynamic message filters
+- [-] Dynamic message filters
   - [ ] Plugin opt for default filter
 - [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
   - needs message tracking
@@ -54,8 +58,8 @@ A plugin to interact with the openai API for Neovim
   - [x] color
 - [x] In visual mode, relay content to chat
   - [x] opts for code-block types
-- [ ] Adjustable filter for messages
-  - [ ] Move filtering into chat window
+- [x] Adjustable filter for messages
+  - [x] Move filtering into chat window
 - [ ] Conversation "Snippets" (see [./conversations-roadmap.md](./conversations-roadmap.md)):
   - Unnamed and unstructured conversations
   - Indexed by topics

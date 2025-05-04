@@ -61,6 +61,7 @@ end
 --- @param buffer integer buffer index
 function Keymaps.setup_chat_buffer_keymaps(buffer)
 	add_keymap("q", Interactions.close_chat_window, "Close chat window", buffer)
+	add_keymap("f", Interactions.open_chat_filter_window, "Open Chat Filter", buffer)
 	add_keymap("<CR>", Interactions.open_message_prompt, "Open message prompt", buffer)
 	add_keymap("<leader>ar", Interactions.rename_current_conversation, "Rename conversation", buffer)
 	add_keymap("<leader>adc", Interactions.delete_current_conversation, "Delete conversation", buffer)

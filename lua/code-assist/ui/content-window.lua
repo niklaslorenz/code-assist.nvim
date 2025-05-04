@@ -21,9 +21,13 @@ local BaseWindow = require("code-assist.ui.base-window")
 --- @field clear fun(win: ContentWindow)
 --- @field scroll_to_previous_item fun(win: ContentWindow, begin: boolean)
 --- @field scroll_to_next_item fun(win: ContentWindow, begin: boolean)
+--- @field set_filter fun(win: ContentWindow, channel: string, include: boolean)
+--- @field get_filters fun(win: ContentWindow): table<string, boolean>
 --- @field private _find_item_index fun(win: ContentWindow, line: integer): integer
+--- @field private _raw_items ContentWindowItem[]
 --- @field private _content ContentWindowItemInternal[]
 --- @field private _line_count integer
+--- @field private _channel_filter table<string, boolean>
 local ContentWindow = {}
 ContentWindow.__index = ContentWindow
 setmetatable(ContentWindow, BaseWindow)
@@ -31,8 +35,10 @@ setmetatable(ContentWindow, BaseWindow)
 function ContentWindow:new(orientation)
 	--- @type ContentWindow
 	local win = BaseWindow.new(self, orientation) --[[@as ContentWindow]]
+	win._raw_items = {}
 	win._content = {}
 	win._line_count = 0
+	win._channel_filter = {}
 	local buf = win:get_buf()
 	vim.bo[buf].modifiable = false
 	vim.bo[buf].filetype = "markdown"
@@ -41,12 +47,21 @@ function ContentWindow:new(orientation)
 	return win
 end
 
-function ContentWindow:item_count()
+function ContentWindow:total_item_count()
+	return #self._raw_items
+end
+
+function ContentWindow:displayed_item_count()
 	return #self._content
 end
 
 function ContentWindow:add_item(item)
 	local buf = self:get_buf()
+	table.insert(self._raw_items, item)
+	local is_included = not self._channel_filter[item.channel]
+	if not is_included then
+		return
+	end
 	local lines = vim.split(item.content, "\n")
 	local start_line
 	if #self._content ~= 0 then
@@ -73,6 +88,12 @@ end
 
 function ContentWindow:remove_last_item()
 	assert(#self._content > 0)
+	local raw_item = self._raw_items[#self._raw_items]
+	table.remove(self._raw_items, #self._raw_items)
+	local is_included = not self._channel_filter[raw_item.channel]
+	if not is_included then
+		return
+	end
 	local buf = self:get_buf()
 	local item = self._content[#self._content]
 	vim.bo[buf].modifiable = true
@@ -83,11 +104,17 @@ function ContentWindow:remove_last_item()
 	assert(vim.api.nvim_buf_line_count(buf) == self._line_count + 1)
 end
 
---- Replace the last item in the window with another one.
 --- # Preconditions:
 --- - `:item_count() > 0`
 --- @param item ContentWindowItem
 function ContentWindow:replace_last_item(item)
+	local raw_item = self._raw_items[#self._raw_items]
+	raw_item.channel = item.channel
+	raw_item.content = item.content
+	local is_included = not self._channel_filter[raw_item.channel]
+	if not is_included then
+		return
+	end
 	assert(#self._content > 0)
 	local buf = self:get_buf()
 	local wrapper = self._content[#self._content]
@@ -104,6 +131,12 @@ function ContentWindow:replace_last_item(item)
 end
 
 function ContentWindow:append_to_last_item(content)
+	local raw_item = self._raw_items[#self._raw_items]
+	raw_item.content = raw_item.content .. content
+	local is_included = not self._channel_filter[raw_item.channel]
+	if not is_included then
+		return
+	end
 	assert(#self._content > 0)
 	local buf = self:get_buf()
 	local new_content_lines = vim.split(content, "\n")
@@ -130,20 +163,36 @@ function ContentWindow:append_to_last_item(content)
 end
 
 function ContentWindow:refresh()
+	self._content = {}
+	for _, item in ipairs(self._raw_items) do
+		if not self._channel_filter[item.channel] then
+			--- @type ContentWindowItemInternal
+			local content_item = {
+				content_lines = vim.split(item.content, "\n"),
+				channel = item.channel,
+				start_line = 0,
+				end_line = 0,
+			}
+			table.insert(self._content, content_item)
+		end
+	end
 	local buf = self:get_buf()
 	vim.bo[buf].modifiable = true
-	vim.api.nvim_buf_set_lines(buf, 0, vim.api.nvim_buf_line_count(buf), true, {})
 	local line_counter = 0
+	local all_lines = {}
 	for _, item in ipairs(self._content) do
 		local line_count = #item.content_lines
 		item.start_line = line_counter
 		item.end_line = line_counter + line_count
-		vim.api.nvim_buf_set_lines(buf, item.start_line, item.end_line, true, item.content_lines)
+		for _, line in ipairs(item.content_lines) do
+			table.insert(all_lines, line)
+		end
 		line_counter = line_counter + line_count
 	end
+	vim.api.nvim_buf_set_lines(buf, 0, vim.api.nvim_buf_line_count(buf) - 1, true, all_lines)
 	vim.bo[buf].modifiable = false
 	self._line_count = line_counter
-	assert(vim.api.nvim_buf_line_count(buf) == self._line_count)
+	assert(vim.api.nvim_buf_line_count(buf) == self._line_count + 1)
 end
 
 function ContentWindow:clear()
@@ -152,6 +201,7 @@ function ContentWindow:clear()
 	vim.api.nvim_buf_set_lines(buf, 0, vim.api.nvim_buf_line_count(buf), true, {})
 	vim.bo[buf].modifiable = false
 	self._content = {}
+	self._raw_items = {}
 	self._line_count = 0
 end
 
@@ -192,6 +242,22 @@ function ContentWindow:scroll_to_next_item(begin)
 		local newline = begin and target_item.start_line or target_item.end_line
 		vim.api.nvim_win_set_cursor(win, { newline + 1, 0 })
 	end
+end
+
+function ContentWindow:set_filter(channel, include)
+	self._channel_filter[channel] = not include
+	self:refresh()
+end
+
+function ContentWindow:get_filters()
+	--- @type table<string, boolean>
+	local filters = {}
+	for _, item in ipairs(self._raw_items) do
+		if filters[item.channel] == nil then
+			filters[item.channel] = self._channel_filter[item.channel] ~= true
+		end
+	end
+	return filters
 end
 
 function ContentWindow:_find_item_index(line)
