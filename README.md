@@ -70,6 +70,7 @@ Bucket List:
 
 ## BUGS
 
+- Closing a window buffer externally will result in an invalid window state
 - When renaming a convesation, last_conversation is not updated resulting in a new conversation being created when opened again after restart
 - Chat window title is not updated when the active conversation is renamed
 

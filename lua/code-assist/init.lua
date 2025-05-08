@@ -8,7 +8,7 @@ end
 
 local PluginOptions = require("code-assist.options")
 local ConversationManager = require("code-assist.conversation-manager")
-local ChatWindowControl = require("code-assist.control.chat-window-control")
+local Control = require("code-assist.control.control")
 local Keymaps = require("code-assist.control.keymaps")
 
 function M.setup(opts)
@@ -24,7 +24,7 @@ function M.setup(opts)
 	vim.api.nvim_set_hl(0, "ChatAssistant", { fg = PluginOptions.assistant_chat_color, bold = true })
 
 	ConversationManager.setup()
-	ChatWindowControl.setup()
+	Control.setup()
 	Keymaps.setup_global_keymaps()
 end
 

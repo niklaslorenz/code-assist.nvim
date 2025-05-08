@@ -2,7 +2,9 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 
 --- @alias WindowOrientation "hsplit"|"vsplit"|"float"
 
---- @alias WindowStatus "visible"|"hidden"
+--- @alias WindowStatus "visible" Indicates that the window was opened
+--- |"hidden" Indicates that the window was hidden
+--- |"layout" Indicates that the window layout has changed
 
 --- @class WindowShowOptions
 --- @field relative_width number?
@@ -11,37 +13,50 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field orientation WindowOrientation?
 
 --- @class BaseWindow
+--- Constructor
 --- @field new fun(win: BaseWindow, orientation: WindowOrientation?): BaseWindow
+--- Destructor
 --- @field dispose fun(win: BaseWindow)
+--- Public Methods
 --- @field get_win fun(win: BaseWindow): integer?
---- @field get_buf fun(win: BaseWindow): integer
---- @field get_orientation fun(win: BaseWindow): WindowOrientation
+--- @field get_buf fun(win: BaseWindow): integer?
+--- @field get_orientation fun(win: BaseWindow): WindowOrientation?
 --- @field is_visible fun(win: BaseWindow): boolean
 --- @field set_title fun(win: BaseWindow, title: string?)
+--- @field redraw fun(win: BaseWindow)
 --- @field show fun(win: BaseWindow, opts: WindowShowOptions?)
 --- @field hide fun(win: BaseWindow)
 --- @field scroll_to_bottom fun(win: BaseWindow)
+--- Private Methods
+--- @field protected _setup_buf fun(win: BaseWindow)
+--- @field protected _setup_autocmds fun(win: BaseWindow)
+--- Public Fields
 --- @field on_visibility_change EventDispatcher<WindowStatus>
---- @field private _buf_id integer
+--- Private fields
+--- @field _augroup integer?
+--- @field private _buf_id integer?
 --- @field private _win_id integer?
---- @field private _orientation WindowOrientation
+--- @field private _last_show_opts WindowShowOptions
+--- @field private _orientation WindowOrientation?
+--- @field private _default_orientation WindowOrientation
 --- @field private _title string?
 local BaseWindow = {}
 BaseWindow.__index = BaseWindow
 
-function BaseWindow:new(orientation)
-	if not orientation then
-		orientation = "float"
+function BaseWindow:new(default_orientation)
+	if not default_orientation then
+		default_orientation = "float"
 	end
 	local new = {
 		on_visibility_change = EventDispatcher:new(),
-		_buf_id = vim.api.nvim_create_buf(false, true),
+		_augroup = nil,
+		_buf_id = nil,
 		_win_id = nil,
-		_orientation = orientation,
+		_last_show_opts = {},
+		_orientation = nil,
+		_default_orientation = default_orientation,
 		_title = nil,
 	}
-	vim.bo[new._buf_id].buftype = "nofile"
-	vim.bo[new._buf_id].swapfile = false
 	setmetatable(new, self)
 	return new
 end
@@ -50,7 +65,18 @@ function BaseWindow:dispose()
 	if self:is_visible() then
 		self:hide()
 	end
-	vim.api.nvim_buf_delete(self._buf_id, { force = true })
+	if self._augroup then
+		vim.api.nvim_del_augroup_by_id(self._augroup)
+		self._augroup = nil
+	end
+	local buf = self:get_buf()
+	if buf then
+		vim.api.nvim_buf_delete(buf, { force = true })
+	end
+end
+
+function BaseWindow:redraw()
+	error("Subclasses of BaseWindow must override BaseWindow:redraw()")
 end
 
 function BaseWindow:get_win()
@@ -61,7 +87,10 @@ function BaseWindow:get_win()
 end
 
 function BaseWindow:get_buf()
-	return self._buf_id
+	if self._buf_id and vim.api.nvim_buf_is_valid(self._buf_id) then
+		return self._buf_id
+	end
+	return nil
 end
 
 function BaseWindow:get_orientation()
@@ -84,23 +113,38 @@ function BaseWindow:set_title(title)
 end
 
 function BaseWindow:show(opts)
-	opts = opts or {}
-	local win = self:get_win()
-	local orientation = opts.orientation or self._orientation
-
-	local origin_window = opts.origin
-	if origin_window ~= nil then
-		if type(origin_window) ~= "number" then
-			origin_window = origin_window --[[@as BaseWindow]]:get_win()
-		end
+	opts = opts or self._last_show_opts
+	local buf = self:get_buf()
+	if not buf then
+		buf = vim.api.nvim_create_buf(false, true)
+		self._buf_id = buf
+		self:_setup_buf()
+		self:_setup_autocmds()
+		self:redraw()
 	end
 
+	local orientation = opts.orientation or self._orientation or self._default_orientation
+	local switched_layout = false
+
+	local win = self:get_win()
 	if win then
 		if orientation == self._orientation then
+			if vim.api.nvim_win_get_buf(win) ~= buf then
+				vim.api.nvim_win_set_buf(win, buf)
+			end
 			vim.api.nvim_set_current_win(win)
 			return
 		else
-			self:hide()
+			vim.api.nvim_win_close(win, true)
+			self._win_id = nil
+			switched_layout = true
+		end
+	end
+
+	local origin_window = opts.origin
+	if origin_window then
+		if type(origin_window) ~= "number" then
+			origin_window = origin_window --[[@as BaseWindow]]:get_win()
 		end
 	end
 
@@ -149,24 +193,56 @@ function BaseWindow:show(opts)
 	end
 
 	self._orientation = orientation
-	self.on_visibility_change:dispatch("visible")
+	self.on_visibility_change:dispatch(switched_layout and "layout" or "visible")
 end
 
 function BaseWindow:hide()
 	local win = self:get_win()
-	if not win then
-		self._win_id = nil
-		return
+	local was_closed = false
+	if win then
+		vim.api.nvim_win_close(win, true)
+		was_closed = true
 	end
-	vim.api.nvim_win_close(win, true)
-	self.on_visibility_change:dispatch("hidden")
+	self._win_id = nil
+	self._orientation = nil
+	if was_closed then
+		self.on_visibility_change:dispatch("hidden")
+	end
 end
 
 function BaseWindow:scroll_to_bottom()
 	local win = self:get_win()
-	assert(win)
+	assert(win, "Scrolling requires the window to be visible")
 	local line_count = vim.api.nvim_buf_line_count(self._buf_id)
 	vim.api.nvim_win_set_cursor(win, { line_count, 0 })
+end
+
+function BaseWindow:_setup_buf()
+	local buf = self:get_buf()
+	assert(buf, "No buffer")
+	vim.bo[buf].buftype = "nofile"
+	vim.bo[buf].swapfile = false
+	vim.bo[buf].bufhidden = "wipe"
+end
+
+function BaseWindow:_setup_autocmds()
+	local buf = self:get_buf()
+	assert(buf)
+	if self._augroup then
+		vim.api.nvim_del_augroup_by_id(self._augroup)
+		self._augroup = nil
+	end
+	self._augroup = vim.api.nvim_create_augroup("CodeAssistBaseWindow" .. buf, { clear = true })
+	vim.api.nvim_create_autocmd({ "BufUnload", "BufDelete", "BufWipeout" }, {
+		group = self._augroup,
+		buffer = buf,
+		callback = function()
+			self:hide()
+			self._buf_id = nil
+			vim.api.nvim_del_augroup_by_id(self._augroup)
+			self._augroup = nil
+		end,
+	})
 end
 
 return BaseWindow

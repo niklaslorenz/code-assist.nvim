@@ -9,7 +9,8 @@ local SelectWindow = require("code-assist.ui.select-window")
 local function get_current_selection()
 	local mode = vim.fn.mode()
 	local start_pos, end_pos
-	if mode == "v" or mode == "V" or mode == "\22" then
+
+	if mode == "v" or mode == "V" then
 		start_pos = vim.fn.getpos("v")
 		end_pos = vim.fn.getpos(".")
 	else
@@ -19,28 +20,79 @@ local function get_current_selection()
 
 	local start_line = start_pos[2]
 	local end_line = end_pos[2]
+	local start_col = start_pos[3]
+	local end_col = end_pos[3]
+
+	if start_line > end_line then
+		local x = start_line
+		start_line = end_line
+		end_line = x
+		x = start_col
+		start_col = end_col
+		end_col = x
+	end
 
 	local selected_lines = {}
 
-	for line_num = start_line, end_line do
-		local line = vim.fn.getline(line_num)
-		if line_num == start_line and line_num == end_line then
-			local start_col = start_pos[3]
-			local end_col = end_pos[3]
-			table.insert(selected_lines, line:sub(start_col, end_col))
-		elseif line_num == start_line then
-			local start_col = start_pos[3]
-			table.insert(selected_lines, line:sub(start_col))
-		elseif line_num == end_line then
-			local end_col = end_pos[3]
-			table.insert(selected_lines, line:sub(1, end_col))
-		else
-			table.insert(selected_lines, line)
+	if mode == "v" then
+		-- Character-wise selection
+		for line_num = start_line, end_line do
+			local line = vim.fn.getline(line_num)
+			if line_num == start_line and line_num == end_line then
+				table.insert(selected_lines, line:sub(start_col, end_col))
+			elseif line_num == start_line then
+				table.insert(selected_lines, line:sub(start_col))
+			elseif line_num == end_line then
+				table.insert(selected_lines, line:sub(1, end_col))
+			else
+				table.insert(selected_lines, line)
+			end
+		end
+	elseif mode == "V" then
+		-- Line-wise selection
+		for line_num = start_line, end_line do
+			table.insert(selected_lines, vim.fn.getline(line_num))
 		end
 	end
 	local selection = table.concat(selected_lines, "\n")
 	return selection
 end
+
+-- local function get_current_selection()
+-- 	local mode = vim.fn.mode()
+-- 	local start_pos, end_pos
+-- 	if mode == "v" or mode == "V" or mode == "\22" then
+-- 		start_pos = vim.fn.getpos("v")
+-- 		end_pos = vim.fn.getpos(".")
+-- 	else
+-- 		start_pos = vim.fn.getpos("'<")
+-- 		end_pos = vim.fn.getpos("'>")
+-- 	end
+--
+-- 	local start_line = start_pos[2]
+-- 	local end_line = end_pos[2]
+--
+-- 	local selected_lines = {}
+--
+-- 	for line_num = start_line, end_line do
+-- 		local line = vim.fn.getline(line_num)
+-- 		if line_num == start_line and line_num == end_line then
+-- 			local start_col = start_pos[3]
+-- 			local end_col = end_pos[3]
+-- 			table.insert(selected_lines, line:sub(start_col, end_col))
+-- 		elseif line_num == start_line then
+-- 			local start_col = start_pos[3]
+-- 			table.insert(selected_lines, line:sub(start_col))
+-- 		elseif line_num == end_line then
+-- 			local end_col = end_pos[3]
+-- 			table.insert(selected_lines, line:sub(1, end_col))
+-- 		else
+-- 			table.insert(selected_lines, line)
+-- 		end
+-- 	end
+-- 	local selection = table.concat(selected_lines, "\n")
+-- 	return selection
+-- end
 
 local function get_current_filetype()
 	return vim.bo.filetype
@@ -75,6 +127,22 @@ end
 
 function Interactions.open_select_window()
 	SelectWindow.open()
+end
+
+function Interactions.goto_message_input()
+	if Windows.Chat:get_orientation() == "float" or not Windows.ChatInput:is_visible() then
+		Interactions.open_message_prompt()
+	else
+		local win = Windows.ChatInput:get_win()
+		local buf = Windows.ChatInput:get_buf()
+		assert(win)
+		assert(buf)
+		vim.api.nvim_set_current_win(win)
+		local last_line = vim.api.nvim_buf_line_count(buf)
+		local last_col = #vim.api.nvim_buf_get_lines(buf, last_line - 1, last_line, true)[1]
+		vim.api.nvim_win_set_cursor(win, { last_line, last_col })
+		vim.api.nvim_feedkeys("a", "n", false)
+	end
 end
 
 function Interactions.open_message_prompt()
@@ -312,7 +380,9 @@ function Interactions.open_chat_filter_window()
 	local win = OptionsWindow:new(Windows.Chat:get_filters(), "*Chat Channels:*", "float")
 	win.on_submit:subscribe(function(event)
 		for k, v in pairs(event) do
+			print("New filter" .. k .. ": " .. (v and "true" or "false"))
 			Windows.Chat:set_filter(k, v)
+			Windows.Chat:refresh_content()
 		end
 	end)
 	win:show()

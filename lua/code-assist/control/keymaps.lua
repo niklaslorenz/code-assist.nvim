@@ -48,6 +48,7 @@ function Keymaps.setup_global_keymaps()
 	add_keymap("<leader>ao", Interactions.open, "Open chat window", nil, { "n", "v" })
 	add_keymap("<leader>am", Interactions.open_message_prompt, "Open message prompt")
 	add_keymap("<leader>ac", Interactions.copy_selection, "Copy selection", nil, { "n", "v" })
+	add_keymap("<leader>ag", Interactions.generate_response, "Generate response")
 	add_keymap(
 		"<leader>am",
 		Interactions.open_message_prompt_for_selection,
@@ -61,12 +62,12 @@ end
 --- @param buffer integer buffer index
 function Keymaps.setup_chat_buffer_keymaps(buffer)
 	add_keymap("q", Interactions.close_chat_window, "Close chat window", buffer)
-	add_keymap("f", Interactions.open_chat_filter_window, "Open Chat Filter", buffer)
-	add_keymap("<CR>", Interactions.open_message_prompt, "Open message prompt", buffer)
-	add_keymap("<leader>ar", Interactions.rename_current_conversation, "Rename conversation", buffer)
-	add_keymap("<leader>adc", Interactions.delete_current_conversation, "Delete conversation", buffer)
-	add_keymap("<leader>adm", Interactions.delete_last_message, "Delete last message", buffer)
-	add_keymap("<leader>ag", Interactions.generate_response, "Generate response", buffer)
+	add_keymap("o", Interactions.open_chat_filter_window, "Open Chat Filter", buffer)
+	add_keymap("<CR>", Interactions.goto_message_input, "Open message prompt", buffer)
+	add_keymap("i", Interactions.goto_message_input, "Open message prompt", buffer)
+	add_keymap("r", Interactions.rename_current_conversation, "Rename conversation", buffer)
+	add_keymap("dc", Interactions.delete_current_conversation, "Delete conversation", buffer)
+	add_keymap("dm", Interactions.delete_last_message, "Delete last message", buffer)
 	add_keymap("[c", Interactions.scroll_to_previous_begin, "previous message begin", buffer)
 	add_keymap("]c", Interactions.scroll_to_next_begin, "next message begin", buffer)
 end
