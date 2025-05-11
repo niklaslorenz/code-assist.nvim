@@ -35,10 +35,12 @@ function ConversationManagerControl.setup()
 			Windows.Chat:add_item(parse_item(m))
 		end
 		local title = nil
-		if event.conversation.type == "listed" then
-			title = "[Conversation] " .. event.conversation.name
-		elseif event.conversation.type == "project" then
-			title = "[" .. event.conversation.name .. "]"
+		if event.conversation then
+			if event.conversation.type == "listed" then
+				title = "[Conversation] " .. event.conversation.name
+			elseif event.conversation.type == "project" then
+				title = "[" .. event.conversation.name .. "]"
+			end
 		end
 		Windows.Chat:set_title(title)
 	end)
