@@ -9,12 +9,14 @@ Roadmap:
 - [x] Refactor Chat window
   - [x] Message Tracking
 - [x] Message Input Window
+- [-] Project conversations
 - [ ] Assistant basic threads
 - [ ] tool calls
-- [ ] Refactor Select Window
+- [x] Refactor Select Window
 
 Bucket List:
 
+- [ ] Put selected context into its own channel
 - [ ] Conversation length management
   - [ ] Conversation token length tracking
   - [ ] Make sure that the system message is not truncated
@@ -29,8 +31,8 @@ Bucket List:
 - [x] Conversation sorting in selection screen
   - [x] keymap with o-<sort order key>
   - [x] plugin opt for default sorting order
-- [-] Dynamic message filters
-  - [ ] Plugin opt for default filter
+- [x] Dynamic message filters
+  - [x] Plugin opt for default filter
 - [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
   - needs message tracking
 - [x] implement a chat completions request object
@@ -39,7 +41,7 @@ Bucket List:
 - [x] Response Streaming
 - [-] Chat editing
   - Goals?
-- [ ] (Refatoring) Cleanup chat-window-control
+- [x] (Refatoring) Cleanup chat-window-control
 - [x] Chat Window Title
 - [x] Multi Line Inputs
 - [-] Keymaps
@@ -73,6 +75,7 @@ Bucket List:
 - Closing a window buffer externally will result in an invalid window state
 - When renaming a convesation, last_conversation is not updated resulting in a new conversation being created when opened again after restart
 - Chat window title is not updated when the active conversation is renamed
+- The context selection is scuffed
 
 ## Setup
 

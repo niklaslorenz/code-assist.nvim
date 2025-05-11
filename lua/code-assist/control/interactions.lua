@@ -4,7 +4,7 @@ local OptionsWindow = require("code-assist.ui.options-window")
 local Options = require("code-assist.options")
 local Windows = require("code-assist.ui.window-instances")
 local ConversationManager = require("code-assist.conversation-manager")
-local SelectWindow = require("code-assist.ui.select-window")
+local ConversationSelectWindow = require("code-assist.ui.conversation-select-window")
 
 local function get_current_selection()
 	local mode = vim.fn.mode()
@@ -125,8 +125,34 @@ function Interactions.open()
 	})
 end
 
-function Interactions.open_select_window()
-	SelectWindow.open()
+function Interactions.open_listed_conversations_selection()
+	local window = ConversationSelectWindow:new("float", nil, nil, Options.default_sort_order)
+	window.on_select:subscribe(function(event)
+		local ok, reason = ConversationManager.load_conversation(event)
+		if not ok then
+			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+		end
+		Windows.Chat:show()
+		window:dispose()
+	end)
+	window:set_title("Listed Conversations")
+	window:show()
+end
+
+function Interactions.open_project_conversations_selection()
+	-- TODO: implement (where to get path?)
+	local path = "?"
+	local window = ConversationSelectWindow:new("float", nil, path, Options.default_sort_order)
+	window.on_select:subscribe(function(event)
+		local ok, reason = ConversationManager.load_conversation(event)
+		if not ok then
+			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+		end
+		Windows.Chat:show()
+		window:dispose()
+	end)
+	window:set_title("Project Conversations")
+	window:show()
 end
 
 function Interactions.goto_message_input()
@@ -252,8 +278,27 @@ function Interactions.create_new_unlisted_conversation()
 	Windows.Chat:show()
 end
 
+function Interactions.create_new_project_conversation()
+	vim.ui.input({ prompt = "New Project Conversation: " }, function(input)
+		if not input then
+			return
+		end
+		if not ConversationManager.is_ready() then
+			vim.notify("ConversationManager is not ready")
+			return
+		end
+		if input == "" then
+			input = nil
+		end
+		local created = ConversationManager.new_project_conversation(input)
+		if created then
+			Windows.Chat:show()
+		end
+	end)
+end
+
 function Interactions.create_new_listed_conversation()
-	vim.ui.input({ prompt = "New Chat:" }, function(input)
+	vim.ui.input({ prompt = "New Conversation:" }, function(input)
 		if not input then
 			return
 		end
@@ -285,7 +330,7 @@ function Interactions.rename_current_conversation()
 				if not input then
 					return
 				end
-				local ok, msg = ConversationManager.rename_listed_conversation(conversation.name, input)
+				local ok, msg = ConversationManager.rename_conversation(conversation.name, input)
 				if not ok then
 					vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
 				end

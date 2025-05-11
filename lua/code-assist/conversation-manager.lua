@@ -2,15 +2,17 @@ local ConversationManager = {}
 
 local EventDispatcher = require("code-assist.event-dispatcher")
 local ChatCompletions = require("code-assist.assistant.chat-completions")
-local PluginOptions = require("code-assist.options")
+local Options = require("code-assist.options")
 
-local data_path = PluginOptions.data_path
+local data_path = Options.data_path
 local conv_path = data_path .. "/conversations"
 local last_conv_file = data_path .. "/last_conv"
-local model = PluginOptions.model
-local initial_system_message = PluginOptions.system_message
+local model = Options.model
+local initial_system_message = Options.system_message
 
---- @alias ConversationSorting "first"|"last"|"name"
+local _, neo_tree_manager = pcall(require, "neo-tree.sources.manager")
+
+--- @alias ConversationSorting "newest"|"oldest"|"name"
 
 --- @class ConversationSwitchEvent
 --- @field conversation Conversation?
@@ -36,10 +38,40 @@ local function ensure_dir(path)
 	end
 end
 
+--- Get the conversation path for the current project
+--- @return string?
+local function get_project_conversations_path()
+	local base_path = neo_tree_manager.get_state("filesystem").path
+	if not base_path then
+		return nil
+	end
+	return base_path .. "/" .. Options.project_conversation_path
+end
+
+--- Get the config path for the current project
+--- @return string?
+local function get_project_config_path()
+	local base_path = get_project_conversations_path()
+	if not base_path then
+		return nil
+	end
+	return base_path .. "/config"
+end
+
 --- Save the last conversation name to disk.
 --- @param name string
 local function save_last(name)
 	vim.fn.writefile({ name }, last_conv_file)
+end
+
+--- Save the last project conversation name to the project config.
+--- @param name string
+local function save_last_project(name)
+	local project_path = get_project_config_path()
+	assert(project_path)
+	ensure_dir(project_path)
+	local file = project_path .. "/last_conv"
+	vim.fn.writefile({ name }, file)
 end
 
 ---Initialize manager and load last conversation if available.
@@ -51,34 +83,47 @@ end
 --- List all saved conversation names.
 --- @nodiscard
 --- @param sorting ConversationSorting?
+--- @param path string? Conversation directory
 --- @return string[]
-function ConversationManager.list_conversations(sorting)
-	sorting = sorting or "last"
+function ConversationManager.list_conversations(sorting, path)
+	if not path then
+		path = conv_path
+	end
+	sorting = sorting or "newest"
 	local files = vim.fn.readdir(conv_path)
 	local convs = {}
 
 	for _, file in ipairs(files) do
 		if file:match("%.json$") then
-			local name = file:sub(1, -6)                         -- remove the .json extension
+			local name = file:sub(1, -6) -- remove the .json extension
 			local mtime = vim.fn.getftime(conv_path .. "/" .. file) -- get the modification time
 			table.insert(convs, { name = name, mtime = mtime })
 		end
 	end
 
 	-- Sort by modification time
-	if sorting == "first" then
+	if sorting == "oldest" then
 		table.sort(convs, function(a, b)
 			return a.mtime < b.mtime
 		end) -- ascending order
-	elseif sorting == "last" then
+	elseif sorting == "newest" then
 		table.sort(convs, function(a, b)
 			return a.mtime > b.mtime
 		end) -- descending order
-	else
-		-- For sorting by name
-		table.sort(convs, function(a, b)
-			return a.name < b.name
+	elseif sorting == "name" then
+		-- Create a temporary table to store lowercased names
+		local temp = {}
+		for i, conv in ipairs(convs) do
+			temp[i] = { original = conv, lower_name = string.lower(conv.name) }
+		end
+		table.sort(temp, function(a, b)
+			return a.lower_name < b.lower_name
 		end)
+		for i, v in ipairs(temp) do
+			convs[i] = v.original
+		end
+	else
+		error("Invalid sorting: " .. sorting)
 	end
 
 	-- Extract sorted names
@@ -95,10 +140,12 @@ end
 --- - `.is_ready() == true`
 --- @nodiscard
 --- @param name string
+--- @param path string?
 --- @return boolean success, string? reason
-function ConversationManager.load_conversation(name)
+function ConversationManager.load_conversation(name, path)
 	assert(ConversationManager.is_ready())
-	local fname = conv_path .. "/" .. name .. ".json"
+	path = path or conv_path
+	local fname = path .. "/" .. name .. ".json"
 	if vim.fn.filereadable(fname) == 0 then
 		return false, "Conversation does not exist"
 	end
@@ -119,9 +166,11 @@ end
 --- # Preconditions:
 --- - `.is_ready() == true`
 --- @nodiscard
+--- @param path string?
 --- @return boolean success, string? reason
-function ConversationManager.load_last_conversation()
+function ConversationManager.load_last_conversation(path)
 	assert(ConversationManager.is_ready())
+	-- TODO: Fix this for project conversations, what to load anyways?
 	if vim.fn.filereadable(last_conv_file) == 0 then
 		return false, "No previous conversation"
 	end
@@ -137,10 +186,13 @@ end
 --- # Preconditions:
 --- - `.is_ready() == true`
 --- @nodiscard
+--- @param name string
+--- @param path string?
 --- @return boolean success, string? reason
-function ConversationManager.delete_conversation(name)
+function ConversationManager.delete_conversation(name, path)
 	assert(ConversationManager.is_ready())
-	local fname = conv_path .. "/" .. name .. ".json"
+	path = path or conv_path
+	local fname = path .. "/" .. name .. ".json"
 	if vim.fn.filereadable(fname) == 0 then
 		return false, "Conversation does not exist"
 	end
@@ -182,11 +234,18 @@ end
 --- - `.has_conversation() == true`
 --- - `.get_current_conversation().type == "listed"`
 --- @nodiscard
+--- @param name string
+--- @param new_name string
+--- @param path string?
 --- @return boolean success, string? reason
-function ConversationManager.rename_listed_conversation(name, new_name)
+function ConversationManager.rename_conversation(name, new_name, path)
 	assert(ConversationManager.is_ready())
 	assert(current_conversation)
 	assert(current_conversation.type == "listed")
+	-- TODO: implement project conversation renaming
+	if path then
+		error("Project conversation renaming not implemented yet")
+	end
 	local fname = conv_path .. "/" .. name .. ".json"
 	if vim.fn.filereadable(fname) == 0 then
 		return false, "Conversation does not exist"
@@ -219,8 +278,9 @@ function ConversationManager.save_current_conversation()
 		vim.fn.writefile({ vim.fn.json_encode({ messages = current_conversation.messages }) }, fname)
 		return true
 	elseif current_conversation.type == "project" then
-		-- TODO: implement
-		return false, "Saving project conversations is not supported yet"
+		local fname = get_project_conversations_path() .. "/" .. current_conversation.name .. ".json"
+		vim.fn.writefile({ vim.fn.json_encode({ messages = current_conversation.messages }) }, fname)
+		return true
 	end
 	error("Unknown conversation type")
 end
@@ -252,6 +312,36 @@ function ConversationManager.new_unlisted_conversation()
 	local messages = { { role = "system", content = initial_system_message } }
 	current_conversation = { name = "", messages = messages, type = "unlisted" }
 	ConversationManager.on_conversation_switch:dispatch({ conversation = current_conversation })
+end
+
+--- @param name string?
+function ConversationManager.new_project_conversation(name)
+	if not Options.has_project_conversations then
+		vim.notify("Project conversations are disabled.", vim.log.levels.INFO)
+		return false
+	end
+	if not get_project_conversations_path() then
+		vim.notify("No current project.", vim.log.levels.INFO)
+		return false
+	end
+	name = name or os.date("%Y-%m-%d_%H-%M-%S") --[[@as string]]
+	local messages = { { role = "system", content = initial_system_message } }
+	if ConversationManager.has_conversation() then
+		local ok, reason = ConversationManager.save_current_conversation()
+		if not ok then
+			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+		end
+	end
+	current_conversation = { name = name, messages = messages, type = "project" }
+	local ok, reason = ConversationManager.save_current_conversation()
+	if not ok then
+		vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+	end
+	save_last_project(name)
+	ConversationManager.on_conversation_switch:dispatch({
+		conversation = current_conversation,
+	})
+	return true
 end
 
 --- Load last conversation or create a new unlisted conversation.

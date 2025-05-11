@@ -1,5 +1,7 @@
 local EventDispatcher = require("code-assist.event-dispatcher")
 
+--- @alias WindowBufferSetupEvent integer
+
 --- @alias WindowOrientation "hsplit"|"vsplit"|"float"
 
 --- @alias WindowStatus "visible" Indicates that the window was opened
@@ -22,6 +24,7 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field get_buf fun(win: BaseWindow): integer?
 --- @field get_orientation fun(win: BaseWindow): WindowOrientation?
 --- @field is_visible fun(win: BaseWindow): boolean
+--- @field has_buffer fun(win: BaseWindow): boolean
 --- @field set_title fun(win: BaseWindow, title: string?)
 --- @field redraw fun(win: BaseWindow)
 --- @field show fun(win: BaseWindow, opts: WindowShowOptions?)
@@ -32,6 +35,7 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field protected _setup_autocmds fun(win: BaseWindow)
 --- Public Fields
 --- @field on_visibility_change EventDispatcher<WindowStatus>
+--- @field on_buffer_setup EventDispatcher<WindowBufferSetupEvent>
 --- Private fields
 --- @field _augroup integer?
 --- @field private _buf_id integer?
@@ -49,6 +53,7 @@ function BaseWindow:new(default_orientation)
 	end
 	local new = {
 		on_visibility_change = EventDispatcher:new(),
+		on_buffer_setup = EventDispatcher:new(),
 		_augroup = nil,
 		_buf_id = nil,
 		_win_id = nil,
@@ -99,6 +104,10 @@ end
 
 function BaseWindow:is_visible()
 	return self:get_win() ~= nil
+end
+
+function BaseWindow:has_buffer()
+	return self:get_buf() ~= nil
 end
 
 function BaseWindow:set_title(title)
@@ -220,6 +229,7 @@ end
 function BaseWindow:_setup_buf()
 	local buf = self:get_buf()
 	assert(buf, "No buffer")
+	self.on_buffer_setup:dispatch(buf)
 	vim.bo[buf].buftype = "nofile"
 	vim.bo[buf].swapfile = false
 	vim.bo[buf].bufhidden = "wipe"

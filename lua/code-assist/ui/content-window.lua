@@ -55,18 +55,6 @@ function ContentWindow:_setup_buf()
 	vim.bo[buf].filetype = "markdown"
 	vim.bo[buf].swapfile = false
 	vim.bo[buf].buftype = "nofile"
-	vim.notify("Setup content window buffer.")
-end
-
-function ContentWindow:_setup_autocmds()
-	BaseWindow._setup_autocmds(self)
-	vim.api.nvim_create_autocmd("BufUnload", {
-		buffer = self:get_buf(),
-		group = self._augroup,
-		callback = function()
-			vim.notify("Content Window Buffer unloaded.")
-		end,
-	})
 end
 
 function ContentWindow:total_item_count()

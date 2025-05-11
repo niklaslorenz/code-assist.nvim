@@ -2,46 +2,35 @@ local Keymaps = {}
 
 local Interactions = require("code-assist.control.interactions")
 local Windows = require("code-assist.ui.window-instances")
-local has_which_key, WhichKey = pcall(require, "which-key")
+local Util = require("code-assist.util")
 
---- @param key string
---- @param func fun()?
---- @param buf integer?
---- @param mode string | string[] | nil
---- @param description string
-local function add_keymap(key, func, description, buf, mode)
-	mode = mode or "n"
-	if has_which_key then
-		WhichKey.add({
-			{
-				mode = mode,
-				buffer = buf,
-				callback = func,
-				lhs = key,
-				noremap = true,
-				desc = description,
-				silent = true,
-			},
-		})
-	elseif func then
-		vim.keymap.set(mode, key, function()
-			func()
-		end, { buffer = buf })
-	end
-end
+local add_keymap = Util.set_keymap
 
 function Keymaps.setup_global_keymaps()
-	add_keymap("<leader>a", nil, "🗨 Code Assist")
-	add_keymap("<leader>aq", Interactions.close_chat_window, "Close chat window", nil, { "n", "v" })
-	add_keymap("<leader>aN", Interactions.create_new_listed_conversation, "New listed conversation", nil, { "n", "v" })
+	add_keymap("<leader>a", nil, "🗨 Code Assist", nil, { "n", "v" })
+
+	add_keymap("<leader>an", nil, "New", nil, { "n", "v" })
+	add_keymap("<leader>anl", Interactions.create_new_listed_conversation, "Listed conversation", nil, { "n", "v" })
+	add_keymap("<leader>anu", Interactions.create_new_unlisted_conversation, "Unlisted conversation", nil, { "n", "v" })
+	add_keymap("<leader>anp", Interactions.create_new_project_conversation, "Project conversation", nil, { "n", "v" })
+
+	add_keymap("<leader>as", nil, "Select Conversation", nil, { "n", "v" })
 	add_keymap(
-		"<leader>an",
-		Interactions.create_new_unlisted_conversation,
-		"New unlisted conversation",
+		"<leader>asl",
+		Interactions.open_listed_conversations_selection,
+		"Listed conversation",
 		nil,
 		{ "n", "v" }
 	)
-	add_keymap("<leader>as", Interactions.open_select_window, "Select conversation", nil, { "n", "v" })
+	add_keymap(
+		"<leader>asp",
+		Interactions.open_project_conversations_selection,
+		"Project conversation",
+		nil,
+		{ "n", "v" }
+	)
+
+	add_keymap("<leader>aq", Interactions.close_chat_window, "Close chat window", nil, { "n", "v" })
 	add_keymap("<leader>av", Interactions.open_vertical_split, "Open vertical split", nil, { "n", "v" })
 	add_keymap("<leader>ah", Interactions.open_horizontal_split, "Open horizontal split", nil, { "n", "v" })
 	add_keymap("<leader>af", Interactions.open_floating_window, "Open floating window", nil, { "n", "v" })
@@ -61,24 +50,24 @@ end
 
 --- @param buffer integer buffer index
 function Keymaps.setup_chat_buffer_keymaps(buffer)
-	add_keymap("q", Interactions.close_chat_window, "Close chat window", buffer)
-	add_keymap("o", Interactions.open_chat_filter_window, "Open Chat Filter", buffer)
-	add_keymap("<CR>", Interactions.goto_message_input, "Open message prompt", buffer)
-	add_keymap("i", Interactions.goto_message_input, "Open message prompt", buffer)
-	add_keymap("r", Interactions.rename_current_conversation, "Rename conversation", buffer)
-	add_keymap("dc", Interactions.delete_current_conversation, "Delete conversation", buffer)
-	add_keymap("dm", Interactions.delete_last_message, "Delete last message", buffer)
-	add_keymap("[c", Interactions.scroll_to_previous_begin, "previous message begin", buffer)
-	add_keymap("]c", Interactions.scroll_to_next_begin, "next message begin", buffer)
+	add_keymap("q", Interactions.close_chat_window, "Close chat window", { buffer = buffer })
+	add_keymap("o", Interactions.open_chat_filter_window, "Open Chat Filter", { buffer = buffer })
+	add_keymap("<CR>", Interactions.goto_message_input, "Open message prompt", { buffer = buffer })
+	add_keymap("i", Interactions.goto_message_input, "Open message prompt", { buffer = buffer })
+	add_keymap("r", Interactions.rename_current_conversation, "Rename conversation", { buffer = buffer })
+	add_keymap("dc", Interactions.delete_current_conversation, "Delete conversation", { buffer = buffer })
+	add_keymap("dm", Interactions.delete_last_message, "Delete last message", { buffer = buffer })
+	add_keymap("[c", Interactions.scroll_to_previous_begin, "previous message begin", { buffer = buffer })
+	add_keymap("]c", Interactions.scroll_to_next_begin, "next message begin", { buffer = buffer })
 end
 
 --- @param buffer integer buffer index
 function Keymaps.setup_chat_input_buffer_keymaps(buffer)
-	add_keymap("q", Interactions.close_chat_window, "Close chat window", buffer)
+	add_keymap("q", Interactions.close_chat_window, "Close chat window", { buffer = buffer })
 	add_keymap("<CR><CR>", function()
 		Windows.ChatInput:commit()
 		Windows.Chat:scroll_to_bottom()
-	end, "Commit chat input", buffer, { "n", "v", "i" })
+	end, "Commit chat input", { buffer = buffer }, { "n", "v", "i" })
 end
 
 return Keymaps
