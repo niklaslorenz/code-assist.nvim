@@ -1,25 +1,28 @@
 local ListWindow = require("code-assist.ui.list-window")
 local Util = require("code-assist.util")
-local ConversationManager = require("code-assist.conversation-manager")
 local EventDispatcher = require("code-assist.event-dispatcher")
+local ConversationIO = require("code-assist.conversations.io")
 
 --- @alias ConversationSelectWindow.SelectEvent string
 
 --- @class ConversationSelectWindow : ListWindow
---- @field new fun(win: ConversationSelectWindow, orientation: WindowOrientation?, header: string?, path: string?, sorting: ConversationSorting): ConversationSelectWindow
+--- @field new fun(win: ConversationSelectWindow, orientation: WindowOrientation?, header: string?, path: string?, sorting: ConversationSorting, mode: "listed" | "project"?): ConversationSelectWindow
 --- @field set_sorting fun(win: ConversationSelectWindow, sorting: ConversationSorting)
 --- @field select_hovered fun(win: ConversationSelectWindow)
 --- @field refresh fun(win: ConversationSelectWindow)
+--- @field private _retrieve_content fun(win: ConversationSelectWindow): string[]
 --- @field on_select EventDispatcher<ConversationSelectWindow.SelectEvent>
+--- @field mode "listed" | "project"
 --- @field private _path string?
 --- @field private _sorting ConversationSorting
 local ConversationSelectWindow = {}
 ConversationSelectWindow.__index = ConversationSelectWindow
 setmetatable(ConversationSelectWindow, ListWindow)
 
-function ConversationSelectWindow:new(orientation, header, path, sorting)
+function ConversationSelectWindow:new(orientation, header, path, sorting, mode)
 	local new = ListWindow.new(ConversationSelectWindow, orientation, header, {}) --[[@as ConversationSelectWindow]]
 	new.on_select = EventDispatcher:new()
+	new.mode = mode or "listed"
 	new._path = path
 	new._sorting = sorting
 	return new
@@ -33,13 +36,13 @@ function ConversationSelectWindow:_setup_buf()
 	local opts = { silent = true, noremap = true, buffer = buf }
 	Util.set_keymap("o", nil, "Order items", opts)
 	Util.set_keymap("od", function()
-		self:set_content(ConversationManager.list_conversations("newest", self._path))
+		self:set_content(self:_retrieve_content())
 	end, "descending modification date", opts)
 	Util.set_keymap("oa", function()
-		self:set_content(ConversationManager.list_conversations("oldest", self._path))
+		self:set_content(self:_retrieve_content())
 	end, "ascending modification date", opts)
 	Util.set_keymap("on", function()
-		self:set_content(ConversationManager.list_conversations("name", self._path))
+		self:set_content(self:_retrieve_content())
 	end, "name", opts)
 	Util.set_keymap("q", function()
 		self:hide()
@@ -60,7 +63,14 @@ function ConversationSelectWindow:_setup_buf()
 				return
 			end
 			if input == "y" or input == "yes" then
-				local ok, reason = ConversationManager.delete_conversation(item, self._path)
+				local ok, reason
+				if self.mode == "listed" then
+					ok, reason = ConversationIO.delete_listed_conversation(item)
+				elseif self.mode == "project" then
+					ok, reason = ConversationIO.delete_project_conversation(item, self._path)
+				else
+					error("Unknown mode: " .. self.mode)
+				end
 				if not ok then
 					vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
 				end
@@ -77,7 +87,14 @@ function ConversationSelectWindow:_setup_buf()
 			if not input then
 				return
 			end
-			local ok, reason = ConversationManager.rename_conversation(item, input)
+			local ok, reason
+			if self.mode == "listed" then
+				ok, reason = ConversationIO.rename_listed_conversation(item, input)
+			elseif self.mode == "project" then
+				ok, reason = ConversationIO.rename_project_conversation(item, input, self._path)
+			else
+				error("Unknown mode: " .. self.mode)
+			end
 			if not ok then
 				vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
 			end
@@ -100,10 +117,17 @@ function ConversationSelectWindow:select_hovered()
 end
 
 function ConversationSelectWindow:refresh()
-	local content = ConversationManager.list_conversations(self._sorting, self._path)
+	local content = self:_retrieve_content()
 	self:set_content(content)
-	if self:has_buffer() then
-		self:redraw()
+end
+
+function ConversationSelectWindow:_retrieve_content()
+	if self.mode == "project" then
+		return ConversationIO.list_project_conversations(self._sorting, self._path)
+	elseif self.mode == "listed" then
+		return ConversationIO.list_listed_conversations(self._sorting)
+	else
+		error("Unknown mode: " .. self.mode)
 	end
 end
 

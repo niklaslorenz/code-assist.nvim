@@ -1,7 +1,7 @@
 local ChatCompletions = {}
 
 local PluginOptions = require("code-assist.options")
-local ChatCompletionDecoder = require("code-assist.assistant.interface.chat-completion-decoder")
+local Interface = require("code-assist.assistant.interface.chat-completions")
 local Curl = require("plenary.curl")
 
 local data_path = PluginOptions.data_path
@@ -15,17 +15,17 @@ end
 --- Generate a response for a given message array and a specific model.
 --- The callback is called, when the response is ready.
 --- @param model string
---- @param messages Message[]
---- @param callback fun(reply: Message)
---- @return ChatCompletionResponseStatus status
+--- @param messages ConversationMessage[]
+--- @param callback fun(reply: ConversationMessage)
+--- @return ConversationManagerStatus status
 ChatCompletions.post_request = function(model, messages, callback)
-	-- TODO: implement plenary posting
 	local payload = vim.fn.json_encode({
 		model = model,
-		messages = messages,
+		messages = Interface.encode_message_array(messages),
 	})
-	--- @type ChatCompletionResponseStatus
+	--- @type ConversationManagerStatus
 	local status = {
+		items = {},
 		complete = false,
 		streamed = false,
 	}
@@ -42,9 +42,9 @@ ChatCompletions.post_request = function(model, messages, callback)
 	}, {
 		stdout_buffered = true,
 		on_stdout = function(_, data)
-			local decode_ok, message = pcall(ChatCompletionDecoder.decode_chat_completion, data)
+			local decode_ok, message = pcall(Interface.decode_chat_completion, data)
 			if decode_ok then
-				status.message = message
+				table.insert(status.items, message)
 				local callback_ok, error_msg = pcall(callback, message)
 				if not callback_ok then
 					print("Error in post_request callback: ")
@@ -61,22 +61,22 @@ ChatCompletions.post_request = function(model, messages, callback)
 end
 
 --- @param model string
---- @param messages Message[]
+--- @param messages ConversationMessage[]
 --- @param on_chunk_ready fun(status: ChatCompletionResponseStatus, new_chunk: ChatCompletionChunk)
 --- @param on_finish? fun(status: ChatCompletionResponseStatus)
---- @return ChatCompletionResponseStatus status
+--- @return ConversationManagerStatus status
 function ChatCompletions.post_streaming_request(model, messages, on_chunk_ready, on_finish)
 	local payload = vim.fn.json_encode({
 		model = model,
-		messages = messages,
+		messages = Interface.encode_message_array(messages),
 		stream = true,
 	})
 
 	vim.fn.writefile({ payload }, temp_file)
 
-	--- @type ChatCompletionResponseStatus
+	--- @type ConversationManagerStatus
 	local status = {
-		chunks = {},
+		items = {},
 		streamed = true,
 		complete = false,
 	}
@@ -96,12 +96,11 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunk_ready,
 			if status.complete then
 				return
 			end
-			local decode_ok, new_chunk_or_error_msg, new_complete =
-					pcall(ChatCompletionDecoder.decode_chat_completion_chunk, data)
+			local decode_ok, new_chunk_or_error_msg, new_complete = pcall(Interface.decode_chat_completion_chunk, data)
 			if decode_ok then
 				local new_chunk = new_chunk_or_error_msg
 				if new_chunk then
-					table.insert(status.chunks, new_chunk)
+					table.insert(status.items, new_chunk)
 					local callback_ok, callback_error_msg = pcall(on_chunk_ready, status, new_chunk)
 					if not callback_ok then
 						vim.notify(callback_error_msg, vim.log.levels.ERROR)
@@ -126,7 +125,6 @@ function ChatCompletions.post_streaming_request(model, messages, on_chunk_ready,
 			end
 		end),
 	})
-
 	return status
 end
 

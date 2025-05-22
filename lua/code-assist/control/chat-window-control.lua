@@ -3,7 +3,8 @@ local ChatWindowControl = {}
 local Options = require("code-assist.options")
 local Keymaps = require("code-assist.control.keymaps")
 local Windows = require("code-assist.ui.window-instances")
-local ConversationManager = require("code-assist.conversation-manager")
+local ConversationManager = require("code-assist.conversations.manager")
+local ConversationIO = require("code-assist.conversations.io")
 
 function ChatWindowControl.setup()
 	Windows.Chat.on_visibility_change:subscribe(function(event)
@@ -39,7 +40,8 @@ function ChatWindowControl.setup()
 			assert(buf)
 			-- Load conversation
 			if not ConversationManager.has_conversation() then
-				ConversationManager.load_last_or_create_new()
+				local conversation = ConversationIO.load_last_or_create_new()
+				ConversationManager.set_conversation(conversation)
 			end
 			-- Setup keymaps
 			Keymaps.setup_chat_buffer_keymaps(buf)

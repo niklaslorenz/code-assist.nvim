@@ -7,7 +7,6 @@ if not has_plenary then
 end
 
 local PluginOptions = require("code-assist.options")
-local ConversationManager = require("code-assist.conversation-manager")
 local Control = require("code-assist.control.control")
 local Keymaps = require("code-assist.control.keymaps")
 
@@ -23,7 +22,6 @@ function M.setup(opts)
 	vim.api.nvim_set_hl(0, "ChatUser", { fg = PluginOptions.user_chat_color, bold = true })
 	vim.api.nvim_set_hl(0, "ChatAssistant", { fg = PluginOptions.assistant_chat_color, bold = true })
 
-	ConversationManager.setup()
 	Control.setup()
 	Keymaps.setup_global_keymaps()
 end

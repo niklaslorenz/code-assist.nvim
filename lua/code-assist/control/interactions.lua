@@ -1,98 +1,14 @@
 local Interactions = {}
 
+local Message = require("code-assist.conversations.message")
+local Util = require("code-assist.util")
 local OptionsWindow = require("code-assist.ui.options-window")
 local Options = require("code-assist.options")
 local Windows = require("code-assist.ui.window-instances")
-local ConversationManager = require("code-assist.conversation-manager")
+local ConversationManager = require("code-assist.conversations.manager")
 local ConversationSelectWindow = require("code-assist.ui.conversation-select-window")
-
-local function get_current_selection()
-	local mode = vim.fn.mode()
-	local start_pos, end_pos
-
-	if mode == "v" or mode == "V" then
-		start_pos = vim.fn.getpos("v")
-		end_pos = vim.fn.getpos(".")
-	else
-		start_pos = vim.fn.getpos("'<")
-		end_pos = vim.fn.getpos("'>")
-	end
-
-	local start_line = start_pos[2]
-	local end_line = end_pos[2]
-	local start_col = start_pos[3]
-	local end_col = end_pos[3]
-
-	if start_line > end_line then
-		local x = start_line
-		start_line = end_line
-		end_line = x
-		x = start_col
-		start_col = end_col
-		end_col = x
-	end
-
-	local selected_lines = {}
-
-	if mode == "v" then
-		-- Character-wise selection
-		for line_num = start_line, end_line do
-			local line = vim.fn.getline(line_num)
-			if line_num == start_line and line_num == end_line then
-				table.insert(selected_lines, line:sub(start_col, end_col))
-			elseif line_num == start_line then
-				table.insert(selected_lines, line:sub(start_col))
-			elseif line_num == end_line then
-				table.insert(selected_lines, line:sub(1, end_col))
-			else
-				table.insert(selected_lines, line)
-			end
-		end
-	elseif mode == "V" then
-		-- Line-wise selection
-		for line_num = start_line, end_line do
-			table.insert(selected_lines, vim.fn.getline(line_num))
-		end
-	end
-	local selection = table.concat(selected_lines, "\n")
-	return selection
-end
-
--- local function get_current_selection()
--- 	local mode = vim.fn.mode()
--- 	local start_pos, end_pos
--- 	if mode == "v" or mode == "V" or mode == "\22" then
--- 		start_pos = vim.fn.getpos("v")
--- 		end_pos = vim.fn.getpos(".")
--- 	else
--- 		start_pos = vim.fn.getpos("'<")
--- 		end_pos = vim.fn.getpos("'>")
--- 	end
---
--- 	local start_line = start_pos[2]
--- 	local end_line = end_pos[2]
---
--- 	local selected_lines = {}
---
--- 	for line_num = start_line, end_line do
--- 		local line = vim.fn.getline(line_num)
--- 		if line_num == start_line and line_num == end_line then
--- 			local start_col = start_pos[3]
--- 			local end_col = end_pos[3]
--- 			table.insert(selected_lines, line:sub(start_col, end_col))
--- 		elseif line_num == start_line then
--- 			local start_col = start_pos[3]
--- 			table.insert(selected_lines, line:sub(start_col))
--- 		elseif line_num == end_line then
--- 			local end_col = end_pos[3]
--- 			table.insert(selected_lines, line:sub(1, end_col))
--- 		else
--- 			table.insert(selected_lines, line)
--- 		end
--- 	end
--- 	local selection = table.concat(selected_lines, "\n")
--- 	return selection
--- end
+local ConversationIO = require("code-assist.conversations.io")
+local ConversationFactory = require("code-assist.conversations.factory")
 
 local function get_current_filetype()
 	return vim.bo.filetype
@@ -126,12 +42,14 @@ function Interactions.open()
 end
 
 function Interactions.open_listed_conversations_selection()
-	local window = ConversationSelectWindow:new("float", nil, nil, Options.default_sort_order)
+	local window = ConversationSelectWindow:new("float", nil, nil, Options.default_sort_order, "listed")
 	window.on_select:subscribe(function(event)
-		local ok, reason = ConversationManager.load_conversation(event)
-		if not ok then
-			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
+		local conversation = ConversationIO.load_listed_conversation(event)
+		if not conversation then
+			vim.notify("Could not load conversation: " .. event)
+			return
 		end
+		ConversationManager.set_conversation(conversation)
 		Windows.Chat:show()
 		window:dispose()
 	end)
@@ -140,14 +58,10 @@ function Interactions.open_listed_conversations_selection()
 end
 
 function Interactions.open_project_conversations_selection()
-	-- TODO: implement (where to get path?)
-	local path = "?"
-	local window = ConversationSelectWindow:new("float", nil, path, Options.default_sort_order)
+	local window = ConversationSelectWindow:new("float", nil, nil, Options.default_sort_order, "project")
 	window.on_select:subscribe(function(event)
-		local ok, reason = ConversationManager.load_conversation(event)
-		if not ok then
-			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
-		end
+		local conversation = ConversationIO.load_project_conversation(event)
+		ConversationManager.set_conversation(conversation)
 		Windows.Chat:show()
 		window:dispose()
 	end)
@@ -177,7 +91,7 @@ function Interactions.open_message_prompt()
 		return
 	end
 	if not ConversationManager.has_conversation() then
-		ConversationManager.new_unlisted_conversation()
+		ConversationManager.set_conversation(ConversationFactory.new_unlisted_conversation())
 	end
 	vim.ui.input({ prompt = "You: " }, function(input)
 		if not input then
@@ -191,10 +105,11 @@ function Interactions.open_message_prompt()
 			vim.notify("No current conversation")
 			return
 		end
-		ConversationManager.add_message({ role = "user", content = input })
-		ConversationManager.generate_streaming_response(function(conversation)
-			if conversation.type ~= "unlisted" then
-				local ok, reason = ConversationManager.save_current_conversation()
+		local message = Message:new("user", "user-direct", input)
+		ConversationManager.add_item(message)
+		ConversationManager.stream_query(function(conversation)
+			if conversation:get_type() ~= "unlisted" then
+				local ok, reason = ConversationIO.save_conversation(conversation)
 				if not ok then
 					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
 				end
@@ -212,7 +127,7 @@ function Interactions.open_message_prompt_for_selection()
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
-	local selection = get_current_selection()
+	local selection = Util.get_current_selection()
 	local filetype = get_current_filetype()
 	local content = "```" .. filetype .. "\n" .. selection .. "\n```"
 	vim.ui.input({ prompt = "You: " }, function(input)
@@ -227,11 +142,11 @@ function Interactions.open_message_prompt_for_selection()
 			vim.notify("No current conversation")
 			return
 		end
-		ConversationManager.add_message({ role = "user", content = content })
-		ConversationManager.add_message({ role = "user", content = input })
-		ConversationManager.generate_streaming_response(function(conversation)
-			if conversation.type ~= "unlisted" then
-				local ok, reason = ConversationManager.save_current_conversation()
+		ConversationManager.add_item(Message:new("user", "user-context", content))
+		ConversationManager.add_item(Message:new("user", "user-direct", input))
+		ConversationManager.stream_query(function(conversation)
+			if conversation:get_type() ~= "unlisted" then
+				local ok, reason = ConversationIO.save_conversation(conversation)
 				if not ok then
 					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
 				end
@@ -249,16 +164,15 @@ function Interactions.copy_selection()
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
-	local selection = get_current_selection()
+	local selection = Util.get_current_selection()
 	local filetype = get_current_filetype()
 	local content = "```" .. filetype .. "\n" .. selection .. "\n```"
-	ConversationManager.add_message({
-		role = "user",
-		content = content,
-	})
+	ConversationManager.add_item(Message:new("user", "user-context", content))
 	Windows.Chat:scroll_to_bottom()
-	if ConversationManager.get_current_conversation().type ~= "unlisted" then
-		local ok, reason = ConversationManager.save_current_conversation()
+	if ConversationManager.get_current_conversation():get_type() ~= "unlisted" then
+		local conversation = ConversationManager.get_current_conversation()
+		assert(conversation)
+		local ok, reason = ConversationIO.save_conversation(conversation)
 		if not ok then
 			vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
 		end
@@ -274,7 +188,7 @@ function Interactions.create_new_unlisted_conversation()
 		vim.notify("Conversation Manager is not ready")
 		return
 	end
-	ConversationManager.new_unlisted_conversation()
+	ConversationManager.set_conversation(ConversationFactory.new_unlisted_conversation())
 	Windows.Chat:show()
 end
 
@@ -290,10 +204,8 @@ function Interactions.create_new_project_conversation()
 		if input == "" then
 			input = nil
 		end
-		local created = ConversationManager.new_project_conversation(input)
-		if created then
-			Windows.Chat:show()
-		end
+		ConversationManager.set_conversation(ConversationFactory.new_project_conversation(input))
+		Windows.Chat:show()
 	end)
 end
 
@@ -309,7 +221,7 @@ function Interactions.create_new_listed_conversation()
 		if input == "" then
 			input = nil
 		end
-		ConversationManager.new_listed_conversation(input)
+		ConversationManager.set_conversation(ConversationFactory.new_listed_conversation(input))
 		Windows.Chat:show()
 	end)
 end
@@ -324,38 +236,15 @@ function Interactions.rename_current_conversation()
 		vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
 		return
 	end
-	local switch = {
-		["listed"] = function()
-			vim.ui.input({ prompt = "Rename:", default = conversation.name }, function(input)
-				if not input then
-					return
-				end
-				local ok, msg = ConversationManager.rename_conversation(conversation.name, input)
-				if not ok then
-					vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
-				end
-			end)
-		end,
-		["unlisted"] = function()
-			vim.ui.input({ prompt = "Name:" }, function(input)
-				if not input then
-					return
-				end
-				local ok, msg = ConversationManager.convert_current_conversation_to_listed(input)
-				if not ok then
-					vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
-				end
-			end)
-		end,
-		["project"] = function()
-			-- TODO: implement
-			error("Saving project conversations is not supported yet")
-		end,
-	}
-	local switch_default = function()
-		error("Invalid conversation type: " .. conversation.type)
-	end;
-	(switch[conversation.type] or switch_default)()
+	vim.ui.input({ prompt = "Rename:", default = conversation.name }, function(input)
+		if not input then
+			return
+		end
+		local ok, msg = ConversationIO.rename_conversation(conversation, input)
+		if not ok then
+			vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
+		end
+	end)
 end
 
 function Interactions.delete_current_conversation()
@@ -363,7 +252,8 @@ function Interactions.delete_current_conversation()
 		vim.notify("No current conversation")
 		return
 	end
-	local name = ConversationManager.get_current_conversation().name
+	local conversation = ConversationManager.get_current_conversation()
+	assert(conversation)
 	vim.ui.input({ prompt = "Delete?" }, function(input)
 		if not input or input ~= "yes" and input ~= "y" then
 			return
@@ -372,7 +262,7 @@ function Interactions.delete_current_conversation()
 			vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
 			return
 		end
-		local ok, reason = ConversationManager.delete_conversation(name)
+		local ok, reason = ConversationIO.delete_conversation(conversation)
 		if not ok then
 			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
 		end
@@ -388,9 +278,11 @@ function Interactions.delete_last_message()
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
-	ConversationManager.delete_last_message()
-	if ConversationManager.get_current_conversation().type ~= "unlisted" then
-		local ok, reason = ConversationManager.save_current_conversation()
+	local current_conv = ConversationManager.get_current_conversation()
+	assert(current_conv)
+	ConversationManager.delete_item()
+	if current_conv:get_type() ~= "unlisted" then
+		local ok, reason = ConversationIO.save_conversation(current_conv)
 		if not ok then
 			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
 		end
@@ -406,7 +298,7 @@ function Interactions.generate_response()
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
-	ConversationManager.generate_streaming_response()
+	ConversationManager.stream_query()
 end
 
 function Interactions.scroll_to_bottom()

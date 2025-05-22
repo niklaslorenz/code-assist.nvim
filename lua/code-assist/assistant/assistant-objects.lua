@@ -1,0 +1,35 @@
+--- @meta
+---
+--- @class AssistantListOpts
+--- @field after string?
+--- @field before string?
+--- @field limit integer?
+--- @field order "asc"|"desc"?
+---
+--- @class AssistantTool
+--- @field type "code_interpreter"|"file_search"|"function"
+--- @class AssistantCodeInterpreter: AssistantTool
+--- @field type "code_interpreter"
+--- @class AssistantFunction: AssistantTool
+--- @field type "function"
+--- @field name string
+--- @field description string
+--- @field parameters string
+--- @field strict boolean
+---
+--- @class AssistantToolResources
+--- @field code_interpreter_file_ids string[]
+--- @field file_search_vector_store_ids string[]
+---
+--- @class AssistantPrototype
+--- @field description string?
+--- @field instructions string?
+--- @field metadata table<string, string>?
+--- @field model string
+--- @field name string?
+--- @field reasoning_effort "low"|"medium"|"high"?
+--- @field response_format { type: "text" } | { type: "json_schema", json_schema: string }?
+--- @field temperature number?
+--- @field tool_resources AssistantToolResources?
+--- @field tools AssistantTool[]?
+--- @field top_p number?

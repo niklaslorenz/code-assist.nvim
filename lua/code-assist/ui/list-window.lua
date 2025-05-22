@@ -43,10 +43,7 @@ function ListWindow:set_content(content)
 	end
 	self._content = content
 	if self:has_buffer() then
-		print("Redrawing because window is visible")
 		self:redraw()
-	else
-		print("Window has no buffer")
 	end
 end
 

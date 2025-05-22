@@ -26,12 +26,7 @@ local Options = {
 	relative_chat_width = 0.3,
 	relative_chat_input_height = 0.3,
 	relative_chat_input_width = 0.3,
-	has_project_conversations = false,
 	project_conversation_path = ".conversations",
 }
-
-local has_neo_tree = pcall(require, "neo-tree")
-
-Options.has_project_conversations = has_neo_tree
 
 return Options
