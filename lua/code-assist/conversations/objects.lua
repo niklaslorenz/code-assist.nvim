@@ -1,9 +1,6 @@
 --- @meta
 
---- @alias ConversationItemClass "item"|"message"
 --- @alias ConversationType "listed"|"unlisted"|"project"
---- @alias ConversationRole "user"|"assistant"|"system"
---- @alias ConversationChannel "assistant"|"user-direct"|"user-generated"|"user-context"|"system"
 --- @alias ConversationSorting "newest"|"oldest"|"name"
 
 --- @class MessageDelta

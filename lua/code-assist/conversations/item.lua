@@ -1,33 +1,34 @@
 --- @class ConversationItem
 --- Static Methods
 --- @field deserialize_subclass fun(data: table): ConversationItem
+--- @field new_subclass fun(class_name: string): ConversationItem
+--- Class Methods
 --- @field deserialize fun(item: ConversationItem, data: table): ConversationItem
---- @field new fun(item: ConversationItem, role: ConversationRole, channel: ConversationChannel): ConversationItem
---- Static Attributes
---- @field protected _type ConversationItemClass
+--- @field new fun(item: ConversationItem, channel: string): ConversationItem
 --- Member Methods
---- @field is fun(item: ConversationItem, item2: ConversationItem): boolean
---- @field get_type fun(item: ConversationItem): ConversationItemClass
 --- @field print fun(item: ConversationItem): string?
 --- @field serialize fun(item: ConversationItem): table
+--- Static Attributes
+--- @field protected _class string
+--- @field private _subclasses table<string, ConversationItem>
 --- Member Attributes
---- @field role ConversationRole
---- @field channel ConversationChannel
+--- @field channel string
 local ConversationItem = {}
 ConversationItem.__index = ConversationItem
-ConversationItem._type = "item"
+ConversationItem._class = "item"
+ConversationItem._subclasses = { [ConversationItem._class] = ConversationItem }
 
-function ConversationItem:get_type()
-	return self._type
+function ConversationItem.new_subclass(class_name)
+	local class = {}
+	class.__index = class
+	class._class = class_name
+	setmetatable(class, ConversationItem)
+	ConversationItem._subclasses[class_name] = class
+	return class
 end
 
-function ConversationItem:is(item2)
-	return self._type == item2._type
-end
-
-function ConversationItem:new(role, channel)
+function ConversationItem:new(channel)
 	local new = {
-		role = role,
 		channel = channel,
 	}
 	setmetatable(new, self)
@@ -35,18 +36,22 @@ function ConversationItem:new(role, channel)
 end
 
 function ConversationItem.deserialize_subclass(data)
-	local type = data.type --[[@as ConversationItemClass]]
-	if type == "message" then
-		return require("code-assist.conversations.message"):deserialize(data)
-	elseif type == "item" then
-		error("Cannot deserialize a conversation item of the abstract type 'item'")
-	else
-		error("Unknown conversation item class: " .. (type or "nil"))
+	local class_name = data.class
+	if not class_name then
+		error("undefined subclass in input data")
 	end
+	local class = ConversationItem._subclasses[class_name]
+	if not class then
+		error("Unknown conversation item subclass: " .. class_name)
+	end
+	if class == "item" then
+		error("Cannot deserialize abstract item class 'item'")
+	end
+	return class:deserialize(data)
 end
 
 function ConversationItem:deserialize(data)
-	assert(self._type == data.type, "Tried to deserialize the wrong item class.")
+	assert(self._class == data.class, "Tried to deserialize the wrong item class.")
 	local deserialized = {
 		role = data.role,
 		channel = data.channel,
@@ -61,8 +66,7 @@ end
 
 function ConversationItem:serialize()
 	local data = {
-		type = self._type,
-		role = self.role,
+		class = self._class,
 		channel = self.channel,
 	}
 	return data
