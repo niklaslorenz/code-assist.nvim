@@ -1,0 +1,1 @@
+{"class":"chat-completion","content":[{"class":"chat-completion-message","role":"system","channel":"system","text":"You are a helpful programming assistant."},{"class":"chat-completion-message","role":"user","channel":"user-input","text":"Hello."},{"class":"chat-completion-message","role":"assistant","channel":"assistant","text":"Hello! How can I assist you today?"}]}

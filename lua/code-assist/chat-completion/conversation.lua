@@ -104,6 +104,8 @@ end
 
 function ChatCompletionConversation:prompt_response()
 	assert(self:is_ready())
+
+	--[[
 	local debouncer = Debouncer:new(function()
 		return {}
 	end, function(accumulator, new_element)
@@ -112,21 +114,18 @@ function ChatCompletionConversation:prompt_response()
 		local text = vim.fn.join(accumulator)
 		self:extend_last_item(text)
 	end, 250)
+	]]
 
 	local request = Interface.post_streaming_request(Options.model, self.content, function(chunk)
 		local delta = chunk.content
 		if not chunk.role then
 			if delta then
 				self:extend_last_item(delta)
-				debouncer:handle(delta)
 			end
 		else
-			debouncer:push()
 			self:add_item(Message:new(chunk.role, "assistant", delta or ""))
 		end
-	end, function(_)
-		debouncer:close()
-	end)
+	end, function(_) end)
 	if self:get_type() ~= "unlisted" then
 		request.on_complete:subscribe(function(_)
 			local ok, reason = IO.save_conversation(self)

@@ -149,7 +149,11 @@ end
 --- @return boolean ok, string? reason
 function IO.save_conversation(conv)
 	local fname = conv:get_path()
-	if not fname or not Util.can_write(fname) then
+	if not fname then
+		return false, "Could not find file path"
+	end
+	ensure_dir(vim.fn.fnamemodify(fname, ":h"))
+	if not Util.can_write(fname) then
 		return false, "Cannot write to file: " .. fname
 	end
 	local data = vim.json.encode(conv:serialize())

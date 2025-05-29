@@ -191,7 +191,12 @@ function Interactions.create_new_project_conversation()
 		if input == "" then
 			input = nil
 		end
-		local conv = Util.get_default_conversation_class():create_project(input)
+		local path = Util.get_current_neo_tree_path()
+		if not path then
+			vim.notify("Could not find project path", vim.log.levels.INFO)
+			return
+		end
+		local conv = Util.get_default_conversation_class():create_project(input, path)
 		ConversationManager.set_conversation(conv)
 		Windows.Chat:show()
 	end)
