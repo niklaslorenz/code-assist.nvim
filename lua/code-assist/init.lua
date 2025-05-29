@@ -23,6 +23,7 @@ function M.setup(opts)
 	vim.api.nvim_set_hl(0, "ChatAssistant", { fg = PluginOptions.assistant_chat_color, bold = true })
 
 	Control.setup()
+	require("code-assist.chat-completion.conversation")
 	Keymaps.setup_global_keymaps()
 end
 

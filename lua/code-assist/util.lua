@@ -9,6 +9,58 @@ function Util.project_conversations_enabled()
 	return has_neo_tree and Options.project_conversation_path ~= nil
 end
 
+function Util.get_default_conversation_class()
+	if Options.default_conversation_class == "chat-completion" then
+		return require("code-assist.chat-completion.conversation")
+	elseif Options.default_conversation_class == "assistant" then
+		return require("code-assist.assistant.conversation")
+	else
+		error("Unknown conversation class: " .. Options.default_conversation_class)
+	end
+end
+
+--- @param list any[]
+--- @param item any
+--- @return integer
+function Util.list_find(list, item)
+	for i, value in ipairs(list) do
+		if value == item then
+			return i
+		end
+	end
+	return -1
+end
+
+--- @param list any[]
+--- @param item any
+--- @return boolean
+function Util.list_contains(list, item)
+	return Util.list_find(list, item) ~= -1
+end
+
+--- @param set any[]
+--- @param item any
+--- @return boolean inserted If the item was actually inserted into the set
+function Util.set_insert(set, item)
+	if Util.list_contains(set, item) then
+		return false
+	end
+	table.insert(set, item)
+	return true
+end
+
+--- @param set any[]
+--- @param item any
+--- @return boolean removed If the item was actually removed
+function Util.set_remove(set, item)
+	local index = Util.list_find(set, item)
+	if index ~= -1 then
+		table.remove(set, index)
+		return true
+	end
+	return false
+end
+
 --- @param path string
 --- @return boolean
 function Util.can_write(path)

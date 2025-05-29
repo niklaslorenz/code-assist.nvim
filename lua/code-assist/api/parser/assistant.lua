@@ -1,8 +1,8 @@
 local Future = require("code-assist.future")
 local Curl = require("plenary.curl")
 local Util = require("code-assist.util")
-local Parsing = require("code-assist.api.interface.parsing")
-local BasicParser = require("code-assist.api.interface.basic-parser")
+local Parsing = require("code-assist.api.parser.parsing")
+local BasicParser = require("code-assist.api.parser.basic-parser")
 
 --- @type {
 --- create: (fun(class: Assistant, prototype: AssistantPrototype): Future<Assistant>),

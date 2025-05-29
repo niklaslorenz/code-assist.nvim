@@ -1,6 +1,5 @@
 local Interactions = {}
 
-local Message = require("code-assist.conversations.message")
 local Util = require("code-assist.util")
 local OptionsWindow = require("code-assist.ui.options-window")
 local Options = require("code-assist.options")
@@ -8,7 +7,6 @@ local Windows = require("code-assist.ui.window-instances")
 local ConversationManager = require("code-assist.conversations.manager")
 local ConversationSelectWindow = require("code-assist.ui.conversation-select-window")
 local ConversationIO = require("code-assist.conversations.io")
-local ConversationFactory = require("code-assist.conversations.factory")
 
 local function get_current_filetype()
 	return vim.bo.filetype
@@ -90,31 +88,22 @@ function Interactions.open_message_prompt()
 		vim.notify("Conversation Manager not ready")
 		return
 	end
-	if not ConversationManager.has_conversation() then
-		ConversationManager.set_conversation(ConversationFactory.new_unlisted_conversation())
+	local conv = ConversationManager.get_conversation()
+	if not conv then
+		vim.notify("No current conversation", vim.log.levels.INFO)
+		return
+	end
+	if not conv:can_handle_text() then
+		vim.notify("This conversation does not support text input", vim.log.levels.INFO)
+		return
 	end
 	vim.ui.input({ prompt = "You: " }, function(input)
 		if not input then
 			return
 		end
-		if not ConversationManager.is_ready() then
-			vim.notify("Conversation Manager not ready")
-			return
-		end
-		if not ConversationManager.has_conversation() then
-			vim.notify("No current conversation")
-			return
-		end
-		local message = Message:new("user", "user-direct", input)
-		ConversationManager.add_item(message)
-		ConversationManager.stream_query(function(conversation)
-			if conversation:get_type() ~= "unlisted" then
-				local ok, reason = ConversationIO.save_conversation(conversation)
-				if not ok then
-					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
-				end
-			end
-		end)
+		vim.notify("Handling user input in interactions: " .. input, vim.log.levels.TRACE) -- WARN: trace
+		conv:handle_user_input_text(input)
+		conv:prompt_response()
 	end)
 end
 
@@ -138,20 +127,14 @@ function Interactions.open_message_prompt_for_selection()
 			vim.notify("Conversation Manager not ready")
 			return
 		end
-		if not ConversationManager.has_conversation() then
+		local conv = ConversationManager.get_conversation()
+		if not conv then
 			vim.notify("No current conversation")
 			return
 		end
-		ConversationManager.add_item(Message:new("user", "user-context", content))
-		ConversationManager.add_item(Message:new("user", "user-direct", input))
-		ConversationManager.stream_query(function(conversation)
-			if conversation:get_type() ~= "unlisted" then
-				local ok, reason = ConversationIO.save_conversation(conversation)
-				if not ok then
-					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
-				end
-			end
-		end)
+		conv:handle_text_context(content)
+		conv:handle_user_input_text(input)
+		conv:prompt_response()
 	end)
 end
 
@@ -160,19 +143,22 @@ function Interactions.copy_selection()
 		vim.notify("Conversation Manager not ready", vim.log.levels.INFO)
 		return
 	end
-	if not ConversationManager.has_conversation() then
+	local conv = ConversationManager.get_conversation()
+	if not conv then
 		vim.notify("No current conversation", vim.log.levels.INFO)
+		return
+	end
+	if not conv:can_handle_text() then
+		vim.notify("This conversation does not support text input")
 		return
 	end
 	local selection = Util.get_current_selection()
 	local filetype = get_current_filetype()
 	local content = "```" .. filetype .. "\n" .. selection .. "\n```"
-	ConversationManager.add_item(Message:new("user", "user-context", content))
+	conv:handle_text_context(content)
 	Windows.Chat:scroll_to_bottom()
-	if ConversationManager.get_current_conversation():get_type() ~= "unlisted" then
-		local conversation = ConversationManager.get_current_conversation()
-		assert(conversation)
-		local ok, reason = ConversationIO.save_conversation(conversation)
+	if conv:get_type() ~= "unlisted" then
+		local ok, reason = ConversationIO.save_conversation(conv)
 		if not ok then
 			vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
 		end
@@ -188,7 +174,8 @@ function Interactions.create_new_unlisted_conversation()
 		vim.notify("Conversation Manager is not ready")
 		return
 	end
-	ConversationManager.set_conversation(ConversationFactory.new_unlisted_conversation())
+	local conv = Util.get_default_conversation_class():create_unlisted()
+	ConversationManager.set_conversation(conv)
 	Windows.Chat:show()
 end
 
@@ -204,7 +191,8 @@ function Interactions.create_new_project_conversation()
 		if input == "" then
 			input = nil
 		end
-		ConversationManager.set_conversation(ConversationFactory.new_project_conversation(input))
+		local conv = Util.get_default_conversation_class():create_project(input)
+		ConversationManager.set_conversation(conv)
 		Windows.Chat:show()
 	end)
 end
@@ -221,13 +209,14 @@ function Interactions.create_new_listed_conversation()
 		if input == "" then
 			input = nil
 		end
-		ConversationManager.set_conversation(ConversationFactory.new_listed_conversation(input))
+		local conv = Util.get_default_conversation_class():create_listed(input)
+		ConversationManager.set_conversation(conv)
 		Windows.Chat:show()
 	end)
 end
 
 function Interactions.rename_current_conversation()
-	local conversation = ConversationManager.get_current_conversation()
+	local conversation = ConversationManager.get_conversation()
 	if not conversation then
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
@@ -252,7 +241,7 @@ function Interactions.delete_current_conversation()
 		vim.notify("No current conversation")
 		return
 	end
-	local conversation = ConversationManager.get_current_conversation()
+	local conversation = ConversationManager.get_conversation()
 	assert(conversation)
 	vim.ui.input({ prompt = "Delete?" }, function(input)
 		if not input or input ~= "yes" and input ~= "y" then
@@ -274,18 +263,14 @@ function Interactions.delete_last_message()
 		vim.notify("Conversation Manager is not ready", vim.log.levels.INFO)
 		return
 	end
-	if not ConversationManager.has_conversation() then
+	local conv = ConversationManager.get_conversation()
+	if not conv then
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
-	local current_conv = ConversationManager.get_current_conversation()
-	assert(current_conv)
-	ConversationManager.delete_item()
-	if current_conv:get_type() ~= "unlisted" then
-		local ok, reason = ConversationIO.save_conversation(current_conv)
-		if not ok then
-			vim.notify(reason or "Unknown error", vim.log.levels.INFO)
-		end
+	local removed = conv:remove_last_item()
+	if not removed then
+		vim.notify("Could not remove the last conversation item", vim.log.levels.INFO)
 	end
 end
 
@@ -294,11 +279,12 @@ function Interactions.generate_response()
 		vim.notify("Conversation Manager is not ready")
 		return
 	end
-	if not ConversationManager.has_conversation() then
+	local conv = ConversationManager.get_conversation()
+	if not conv then
 		vim.notify("No current conversation", vim.log.levels.INFO)
 		return
 	end
-	ConversationManager.stream_query()
+	conv:prompt_response()
 end
 
 function Interactions.scroll_to_bottom()

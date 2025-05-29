@@ -2,10 +2,6 @@
 
 --- @alias ChatCompletionRole "system"|"user"|"assistant"
 
---- @class ChatCompletionMessage
---- @field content string
---- @field role ChatCompletionRole
-
 --- @class ChatCompletionToolCall
 --- @field index integer,
 --- @field id string,

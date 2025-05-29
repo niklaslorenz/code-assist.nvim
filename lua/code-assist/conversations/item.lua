@@ -8,6 +8,7 @@
 --- Member Methods
 --- @field print fun(item: ConversationItem): string?
 --- @field serialize fun(item: ConversationItem): table
+--- @field get_user_descriptor fun(item: ConversationItem): string
 --- Static Attributes
 --- @field protected _class string
 --- @field private _subclasses table<string, ConversationItem>
@@ -53,7 +54,6 @@ end
 function ConversationItem:deserialize(data)
 	assert(self._class == data.class, "Tried to deserialize the wrong item class.")
 	local deserialized = {
-		role = data.role,
 		channel = data.channel,
 	}
 	setmetatable(deserialized, self)
@@ -70,6 +70,10 @@ function ConversationItem:serialize()
 		channel = self.channel,
 	}
 	return data
+end
+
+function ConversationItem:get_user_descriptor()
+	return self.channel
 end
 
 return ConversationItem

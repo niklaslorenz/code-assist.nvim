@@ -1,4 +1,4 @@
-local Interface = require("code-assist.assistant.interface.assistant")
+local Parser = require("code-assist.api.parser.assistant")
 
 --- @class Assistant
 --- @field created_at integer
@@ -21,19 +21,19 @@ local Assistant = {}
 Assistant.__index = Assistant
 
 function Assistant:load(id)
-	return Interface.load(self, id)
+	return Parser.load(self, id)
 end
 
 function Assistant:create(prototype)
-	return Interface.create(self, prototype)
+	return Parser.create(self, prototype)
 end
 
 function Assistant:delete()
-	return Interface.delete(self)
+	return Parser.delete(self)
 end
 
 function Assistant:list(opts)
-	return Interface.list(self, opts)
+	return Parser.list(self, opts)
 end
 
 return Assistant

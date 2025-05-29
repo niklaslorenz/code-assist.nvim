@@ -11,6 +11,7 @@
 --- @field relative_chat_input_width number?
 --- @field relative_chat_input_height number?
 --- @field project_conversation_path string?
+--- @field default_conversation_class "assistant"|"chat-completion"?
 
 local Options = {
 	model = "gpt-4o-mini",
@@ -27,6 +28,7 @@ local Options = {
 	relative_chat_input_height = 0.3,
 	relative_chat_input_width = 0.3,
 	project_conversation_path = ".conversations",
+	default_conversation_class = "chat-completion",
 }
 
 return Options

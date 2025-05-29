@@ -2,8 +2,6 @@ local ChatInputWindowControl = {}
 
 local Windows = require("code-assist.ui.window-instances")
 local ConversationManager = require("code-assist.conversations.manager")
-local ConversationIO = require("code-assist.conversations.io")
-local Message = require("code-assist.conversations.message")
 local Keymaps = require("code-assist.control.keymaps")
 
 function ChatInputWindowControl.setup()
@@ -28,21 +26,18 @@ function ChatInputWindowControl.setup()
 			vim.notify("Conversation Manager not ready", vim.log.levels.INFO)
 			return
 		end
-		if not ConversationManager.has_conversation() then
+		local conv = ConversationManager.get_conversation()
+		if not conv then
 			vim.notify("No current conversation", vim.log.levels.INFO)
 			return
 		end
+		if not conv:can_handle_text() then
+			vim.notify("This conversation does not support text input.")
+			return
+		end
+		conv:handle_user_input_text(event)
+		conv:prompt_response()
 		Windows.ChatInput:clear()
-		local message = Message:new("user", "user-direct", event)
-		ConversationManager.add_item(message)
-		ConversationManager.stream_query(function(conversation)
-			if conversation:get_type() ~= "unlisted" then
-				local ok, reason = ConversationIO.save_conversation(conversation)
-				if not ok then
-					vim.notify(reason or "Unknown error", vim.log.levels.WARN)
-				end
-			end
-		end)
 	end)
 end
 

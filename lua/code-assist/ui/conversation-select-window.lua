@@ -53,12 +53,12 @@ function ConversationSelectWindow:_setup_buf()
 	Util.set_keymap("l", function()
 		self:select_hovered()
 	end, "Select", opts)
-	Util.set_keymap("d", function()
+	Util.set_keymap("x", function()
 		local item = self:get_hovered_item()
 		if not item then
 			return
 		end
-		vim.ui.input({ prompt = "Delete " .. item .. "?", default = "no" }, function(input)
+		vim.ui.input({ prompt = "Delete " .. item .. "?" }, function(input)
 			if not input then
 				return
 			end

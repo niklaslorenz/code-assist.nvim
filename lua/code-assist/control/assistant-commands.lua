@@ -1,6 +1,6 @@
 local AssistantCommands = {}
 local ListWindow = require("code-assist.ui.list-window")
-local Assistant = require("code-assist.assistant.assistant")
+local AssistantApi = require("code-assist.api.assistant")
 
 local function assistantListCommand(opts)
   --- @type number
@@ -10,7 +10,7 @@ local function assistantListCommand(opts)
   else
     num_elements = 20
   end
-  local assistants = Assistant:list({
+  local assistants = AssistantApi:list({
     limit = num_elements,
     order = "desc",
   })

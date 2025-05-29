@@ -1,6 +1,6 @@
 local ChatCompletionParser = {}
 
-local Parsing = require("code-assist.assistant.parsing.parsing")
+local Parsing = require("code-assist.api.parser.parsing")
 
 --- @param data any
 --- @return ChatCompletionToolCall
@@ -127,12 +127,12 @@ end
 
 --- @param messages ChatCompletionMessage[]
 function ChatCompletionParser.encode_message_array(messages)
-	--- @type {role: "system"|"user"|"assistant", content: string}[]
+	--- @type {role: ChatCompletionRole, content: string}[]
 	local encoded = {}
 	for i, message in ipairs(messages) do
 		encoded[i] = {
 			role = message.role,
-			content = message.content,
+			content = message.text,
 		}
 	end
 	return encoded

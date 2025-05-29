@@ -5,14 +5,7 @@ local Windows = require("code-assist.ui.window-instances")
 
 --- @param item ConversationItem
 local function parse_item(item)
-	local header
-	if item.role == "user" then
-		header = "*User:*"
-	elseif item.role == "assistant" then
-		header = "*Assistant:*"
-	else
-		header = "*System:*"
-	end
+	local header = "*" .. item:get_user_descriptor() .. ":*"
 
 	local item_lines = { "___", header }
 	local content = item:print() or "<empty>"
@@ -23,37 +16,36 @@ local function parse_item(item)
 	--- @type ContentWindowItem
 	local window_item = {
 		content = item_content,
-		channel = item.role,
+		channel = item.channel,
 	}
 	return window_item
 end
 
 function ConversationManagerControl.setup()
-	ConversationManager.on_conversation_switch:subscribe(function(event)
-		local items = event.conversation ~= nil and event.conversation.content or {}
+	ConversationManager.observer.on_conversation_switch:subscribe(function(event)
+		local items = event.new_conversation ~= nil and event.new_conversation:get_content() or {}
 		Windows.Chat:clear()
 		for _, m in ipairs(items) do
 			Windows.Chat:add_item(parse_item(m))
 		end
 		local title = nil
-		if event.conversation then
-			local type
-			event.conversation:get_type()
+		if event.new_conversation then
+			local type = event.new_conversation:get_type()
 			if type == "listed" then
-				title = "[Conversation] " .. event.conversation.name
+				title = "[Conversation] " .. event.new_conversation.name
 			elseif type == "project" then
-				title = "[" .. event.conversation.name .. "]"
+				title = "[" .. event.new_conversation.name .. "]"
 			end
 		end
 		Windows.Chat:set_title(title)
 	end)
 
-	ConversationManager.on_new_item:subscribe(function(event)
-		Windows.Chat:add_item(parse_item(event.new_item))
+	ConversationManager.observer.on_new_item:subscribe(function(event)
+		Windows.Chat:add_item(parse_item(event.item))
 	end)
 
-	ConversationManager.on_message_extended:subscribe(function(event)
-		Windows.Chat:append_to_last_item(event.delta)
+	ConversationManager.observer.on_item_extended:subscribe(function(event)
+		Windows.Chat:append_to_last_item(event.extension)
 	end)
 end
 

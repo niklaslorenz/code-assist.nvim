@@ -1,0 +1,18 @@
+--- @meta
+---
+--- @class ConversationEvent
+--- @field conversation Conversation
+---
+--- @class ConversationNewItemEvent: ConversationEvent
+--- @field item ConversationItem
+---
+--- @class ConversationItemExtendedEvent: ConversationEvent
+--- @field item ConversationItem
+--- @field extension string
+---
+--- @class ConversationItemDeletedEvent: ConversationEvent
+--- @field item ConversationItem
+---
+--- @class ConversationSwitchEvent
+--- @field new_conversation Conversation?
+--- @field old_conversation Conversation?

@@ -3,7 +3,6 @@ local IO = {}
 local Path = require("code-assist.conversations.path")
 local Conversation = require("code-assist.conversations.conversation")
 local Util = require("code-assist.util")
-local Factory = require("code-assist.conversations.factory")
 
 --- @param path string
 local function ensure_dir(path)
@@ -18,7 +17,7 @@ local function load_conversation(fname)
 	local content = vim.fn.readfile(fname)
 	local ok, data = pcall(vim.fn.json_decode, table.concat(content, "\n"))
 	if ok then
-		return Conversation:deserialize(data)
+		return Conversation.deserialize_subclass(data)
 	else
 		return nil
 	end
@@ -194,7 +193,7 @@ function IO.load_last_or_create_new(project_path)
 	if conv then
 		return conv
 	end
-	return Factory.new_unlisted_conversation()
+	return Util.get_default_conversation_class():create_unlisted()
 end
 
 local function rename(fname, new_fname)
@@ -216,7 +215,7 @@ end
 function IO.rename_conversation(conv, new_name)
 	local fname = conv:get_path()
 	local new_fname = conv.project_path and Path.get_project_conversation_path(conv.project_path, new_name)
-		or Path.get_listed_conversation_path(new_name)
+			or Path.get_listed_conversation_path(new_name)
 	return rename(fname, new_fname)
 end
 
@@ -286,7 +285,11 @@ end
 --- @param path string?
 --- @return string[] names
 function IO.list_project_conversations(sorting, path)
-	local conv_path = IO.get_project_conversation_path(path)
+	local conv_path = Path.get_project_conversation_path(path)
+	if not conv_path then
+		vim.notify("Could not find project path", vim.log.levels.WARN)
+		return {}
+	end
 	return list_conversations(sorting, conv_path)
 end
 
