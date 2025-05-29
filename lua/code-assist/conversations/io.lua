@@ -244,6 +244,40 @@ function IO.rename_project_conversation(name, new_name, project_path)
 	return rename(fname, new_fname)
 end
 
+--- @nodidcard
+--- @param name string
+--- @param project_path string?
+--- @return boolean ok, string? reason
+function IO.change_to_project_conversation(name, project_path)
+	local fname = Path.get_listed_conversation_path(name)
+	local new_fname = Path.get_project_conversation_path(project_path, name)
+	if not new_fname then
+		return false, "Could not get project path"
+	end
+	ensure_dir(vim.fn.fnamemodify(new_fname, ":h"))
+	local data = vim.fn.readfile(fname)
+	vim.fn.writefile(data, new_fname)
+	vim.fn.delete(fname)
+	return true
+end
+
+--- @nodiscard
+--- @param name string
+--- @param project_path string?
+--- @return boolean ok, string? reason
+function IO.change_to_listed_conversation(name, project_path)
+	local fname = Path.get_project_conversation_path(project_path, name)
+	local new_fname = Path.get_listed_conversation_path(name)
+	if not fname then
+		return false, "Could not get project path"
+	end
+	ensure_dir(vim.fn.fnamemodify(new_fname, ":h"))
+	local data = vim.fn.readfile(fname)
+	vim.fn.writefile(data, new_fname)
+	vim.fn.delete(fname)
+	return true
+end
+
 local function delete(fname)
 	if not fname or vim.fn.filereadable(fname) == 0 then
 		return false, "Could not find conversation file"

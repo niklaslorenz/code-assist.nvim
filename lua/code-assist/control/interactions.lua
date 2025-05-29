@@ -40,7 +40,7 @@ function Interactions.open()
 end
 
 function Interactions.open_listed_conversations_selection()
-	local window = ConversationSelectWindow:new("float", nil, nil, Options.default_sort_order, "listed")
+	local window = ConversationSelectWindow:new("float", nil, Options.default_sort_order, "listed")
 	window.on_select:subscribe(function(event)
 		local conversation = ConversationIO.load_listed_conversation(event)
 		if not conversation then
@@ -56,7 +56,7 @@ function Interactions.open_listed_conversations_selection()
 end
 
 function Interactions.open_project_conversations_selection()
-	local window = ConversationSelectWindow:new("float", nil, nil, Options.default_sort_order, "project")
+	local window = ConversationSelectWindow:new("float", nil, Options.default_sort_order, "project")
 	window.on_select:subscribe(function(event)
 		local conversation = ConversationIO.load_project_conversation(event)
 		ConversationManager.set_conversation(conversation)

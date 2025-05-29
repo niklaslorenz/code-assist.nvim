@@ -6,24 +6,22 @@ local ConversationIO = require("code-assist.conversations.io")
 --- @alias ConversationSelectWindow.SelectEvent string
 
 --- @class ConversationSelectWindow : ListWindow
---- @field new fun(win: ConversationSelectWindow, orientation: WindowOrientation?, header: string?, path: string?, sorting: ConversationSorting, mode: "listed" | "project"?): ConversationSelectWindow
+--- @field new fun(win: ConversationSelectWindow, orientation: WindowOrientation?, header: string?, sorting: ConversationSorting, mode: "listed" | "project"?): ConversationSelectWindow
 --- @field set_sorting fun(win: ConversationSelectWindow, sorting: ConversationSorting)
 --- @field select_hovered fun(win: ConversationSelectWindow)
 --- @field refresh fun(win: ConversationSelectWindow)
 --- @field private _retrieve_content fun(win: ConversationSelectWindow): string[]
 --- @field on_select EventDispatcher<ConversationSelectWindow.SelectEvent>
 --- @field mode "listed" | "project"
---- @field private _path string?
 --- @field private _sorting ConversationSorting
 local ConversationSelectWindow = {}
 ConversationSelectWindow.__index = ConversationSelectWindow
 setmetatable(ConversationSelectWindow, ListWindow)
 
-function ConversationSelectWindow:new(orientation, header, path, sorting, mode)
+function ConversationSelectWindow:new(orientation, header, sorting, mode)
 	local new = ListWindow.new(ConversationSelectWindow, orientation, header, {}) --[[@as ConversationSelectWindow]]
 	new.on_select = EventDispatcher:new()
 	new.mode = mode or "listed"
-	new._path = path
 	new._sorting = sorting
 	return new
 end
@@ -67,7 +65,7 @@ function ConversationSelectWindow:_setup_buf()
 				if self.mode == "listed" then
 					ok, reason = ConversationIO.delete_listed_conversation(item)
 				elseif self.mode == "project" then
-					ok, reason = ConversationIO.delete_project_conversation(item, self._path)
+					ok, reason = ConversationIO.delete_project_conversation(item)
 				else
 					error("Unknown mode: " .. self.mode)
 				end
@@ -91,7 +89,7 @@ function ConversationSelectWindow:_setup_buf()
 			if self.mode == "listed" then
 				ok, reason = ConversationIO.rename_listed_conversation(item, input)
 			elseif self.mode == "project" then
-				ok, reason = ConversationIO.rename_project_conversation(item, input, self._path)
+				ok, reason = ConversationIO.rename_project_conversation(item, input)
 			else
 				error("Unknown mode: " .. self.mode)
 			end
@@ -101,6 +99,44 @@ function ConversationSelectWindow:_setup_buf()
 			self:refresh()
 		end)
 	end, "Rename", opts)
+	Util.set_keymap("m", nil, "Move conversation")
+	if self.mode == "listed" then
+		Util.set_keymap("mp", function()
+			local item = self:get_hovered_item()
+			if not item then
+				return
+			end
+			vim.ui.input({ prompt = "Move to Project Conversations?" }, function(input)
+				if not input then
+					return
+				end
+				if input == "yes" or input == "y" then
+					local ok, reason = ConversationIO.change_to_project_conversation(item)
+					if not ok then
+						vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
+					end
+				end
+			end)
+		end, "Move to project conversations", opts)
+	elseif self.mode == "project" then
+		Util.set_keymap("ml", function()
+			local item = self:get_hovered_item()
+			if not item then
+				return
+			end
+			vim.ui.input({ prompt = "Move to Listed Conversations?" }, function(input)
+				if not input then
+					return
+				end
+				if input == "yes" or input == "y" then
+					local ok, reason = ConversationIO.change_to_listed_conversation(item)
+					if not ok then
+						vim.notify(reason or "Unknown error", vim.log.levels.ERROR)
+					end
+				end
+			end)
+		end, "Move to listed conversations", opts)
+	end
 	self:refresh()
 end
 
@@ -123,7 +159,7 @@ end
 
 function ConversationSelectWindow:_retrieve_content()
 	if self.mode == "project" then
-		return ConversationIO.list_project_conversations(self._sorting, self._path)
+		return ConversationIO.list_project_conversations(self._sorting)
 	elseif self.mode == "listed" then
 		return ConversationIO.list_listed_conversations(self._sorting)
 	else
