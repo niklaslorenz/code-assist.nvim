@@ -38,7 +38,7 @@ local Util = require("code-assist.util")
 local Conversation = {}
 Conversation.__index = Conversation
 Conversation._class = "base"
-Conversation._subclasses = { "base" }
+Conversation._subclasses = { ["base"] = Conversation }
 
 function Conversation.new_subclass(class_name)
 	local class = {}

@@ -47,6 +47,10 @@ function ConversationManagerControl.setup()
 	ConversationManager.observer.on_item_extended:subscribe(function(event)
 		Windows.Chat:append_to_last_item(event.extension)
 	end)
+
+	ConversationManager.observer.on_item_deleted:subscribe(function(_)
+		Windows.Chat:remove_last_item()
+	end)
 end
 
 return ConversationManagerControl
