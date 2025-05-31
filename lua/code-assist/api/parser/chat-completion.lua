@@ -92,7 +92,7 @@ local function parse_completion(data)
 		created = Parsing.try_get_number("created", "integer", data),
 		id = Parsing.try_get("id", "string", data),
 		model = Parsing.try_get("model", "string", data),
-		system_fingerprint = Parsing.try_get("system_fingerprint", "string", data),
+		system_fingerprint = Parsing.try_get_optional("system_fingerprint", "string", data) or "<undefined>",
 		usage = Parsing.try_parse_optional_object("usage", data, parse_usage),
 	}
 	return chunk
