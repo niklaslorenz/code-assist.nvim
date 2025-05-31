@@ -8,7 +8,7 @@ local IO = require("code-assist.conversations.io")
 
 --- @class ChatCompletionConversation: Conversation
 --- Static Methods
---- @field new fun(conv: ChatCompletionConversation, name: string?, path: string?): ChatCompletionConversation
+--- @field new fun(conv: ChatCompletionConversation, name: string?, path: string?, model: string?): ChatCompletionConversation
 --- Class Methods
 --- @field deserialize fun(conv: ChatCompletionConversation, data: table): ChatCompletionConversation
 --- Member Methods
@@ -19,12 +19,14 @@ local IO = require("code-assist.conversations.io")
 --- @field get_content fun(conv: ChatCompletionConversation): ConversationItem[]
 --- Member Fields
 --- @field content ChatCompletionMessage[]
+--- @field model string?
 --- @field private _current_operation Future<any>?
 local ChatCompletionConversation = Conversation.new_subclass("chat-completion")
 
-function ChatCompletionConversation:new(name, path)
+function ChatCompletionConversation:new(name, path, model)
 	local new = Conversation.new(self, name, path) --[[@as ChatCompletionConversation]]
-	self.content = {}
+	new.content = {}
+	new.model = model
 	return new
 end
 
@@ -60,7 +62,14 @@ function ChatCompletionConversation:add_item(item)
 end
 
 function ChatCompletionConversation:can_remove_last_item()
-	return #self.content > 0
+	if #self.content == 0 then
+		return false
+	end
+	local item = self.content[#self.content]
+	if item.role == "system" then
+		return false
+	end
+	return true
 end
 
 function ChatCompletionConversation:remove_last_item()
@@ -82,6 +91,9 @@ end
 function ChatCompletionConversation:extend_last_item(delta)
 	local index = #self.content
 	local item = self.content[index]
+	if item.role == "system" then
+		error("Cannot extend system messages")
+	end
 	item.text = item.text .. delta
 	self:notify(function(obs)
 		obs.on_item_extended:dispatch({
@@ -99,6 +111,7 @@ function ChatCompletionConversation:deserialize(data)
 		content[i] = Item.deserialize_subclass(item_data)
 	end
 	conv.content = content
+	conv.model = data.model
 	return conv
 end
 
@@ -116,7 +129,7 @@ function ChatCompletionConversation:prompt_response()
 	end, 250)
 	]]
 
-	local request = Interface.post_streaming_request(Options.model, self.content, function(chunk)
+	local request = Interface.post_streaming_request(self.model, self.content, function(chunk)
 		local delta = chunk.content
 		if not chunk.role then
 			if delta then
@@ -170,6 +183,7 @@ function ChatCompletionConversation:serialize()
 		serialized_content[i] = item:serialize()
 	end
 	data.content = serialized_content
+	data.model = self.model
 	return data
 end
 

@@ -9,6 +9,30 @@ function Util.project_conversations_enabled()
 	return has_neo_tree and Options.project_conversation_path ~= nil
 end
 
+--- @return string
+function Util.get_default_model_name()
+	local name = Options.default_model
+	if not name then
+		error("Could not find default model")
+	end
+	return name
+end
+
+--- @return string[]
+function Util.get_available_model_names()
+	local names = {}
+	for name, _ in pairs(Options.models) do
+		table.insert(names, name)
+	end
+	return names
+end
+
+--- @param name string
+--- @return string
+function Util.get_model_id(name)
+	return Options.models[name]
+end
+
 function Util.get_default_conversation_class()
 	if Options.default_conversation_class == "chat-completion" then
 		return require("code-assist.chat-completion.conversation")

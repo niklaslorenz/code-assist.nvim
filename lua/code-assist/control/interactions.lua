@@ -1,5 +1,6 @@
 local Interactions = {}
 
+local ChatCompletionConversation = require("code-assist.chat-completion.conversation")
 local Util = require("code-assist.util")
 local OptionsWindow = require("code-assist.ui.options-window")
 local Options = require("code-assist.options")
@@ -101,7 +102,6 @@ function Interactions.open_message_prompt()
 		if not input then
 			return
 		end
-		vim.notify("Handling user input in interactions: " .. input, vim.log.levels.TRACE) -- WARN: trace
 		conv:handle_user_input_text(input)
 		conv:prompt_response()
 	end)
@@ -314,6 +314,30 @@ function Interactions.open_chat_filter_window()
 		end
 	end)
 	win:show()
+end
+
+function Interactions.open_model_select()
+	local conv = ConversationManager.get_conversation()
+	if not conv then
+		vim.notify("No current conversation")
+		return
+	end
+	if conv:get_class() ~= ChatCompletionConversation:get_class() then
+		vim.notify("Model selection only available for chat completion conversations")
+		return
+	end
+	--- @cast conv ChatCompletionConversation
+	local names = Util.get_available_model_names()
+	vim.ui.select(names, {
+		prompt = "Select Model",
+	}, function(name, idx)
+		if idx == nil then
+			return
+		end
+		local model = names[idx]
+		conv.model = model
+		vim.notify("Using model: " .. name)
+	end)
 end
 
 return Interactions

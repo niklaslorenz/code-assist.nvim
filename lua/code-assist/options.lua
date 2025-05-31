@@ -1,5 +1,6 @@
 --- @class CodeAssistOptions?
---- @field model string?
+--- @field default_model string?
+--- @field models table<string, string>?
 --- @field system_message string?
 --- @field user_chat_color string?
 --- @field assistant_chat_color string?
@@ -14,7 +15,12 @@
 --- @field default_conversation_class "assistant"|"chat-completion"?
 
 local Options = {
-	model = "gpt-4o-mini",
+	default_model = "gpt-4o-mini",
+	models = {
+		["gpt-4o-mini"] = "gpt-4o-mini",
+		["gpt-4o"] = "gpt-4o",
+		["o4-mini"] = "o4-mini",
+	},
 	system_message = "You are a helpful programming assistant.",
 	user_chat_color = "#a3be8c",
 	assistant_chat_color = "#88c0d0",

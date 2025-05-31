@@ -265,7 +265,7 @@ function ContentWindow:_append_buffer_content(content, channel)
 end
 
 function ContentWindow:_remove_buffer_content(replacement)
-	local item = self._content[self._content]
+	local item = self._content[#self._content]
 	table.remove(self._content, #self._content)
 	self._line_count = self._line_count - #item.content_lines
 	local replacement_lines = nil
