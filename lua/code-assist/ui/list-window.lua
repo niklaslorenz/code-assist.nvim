@@ -28,6 +28,7 @@ function ListWindow:new(orientation, header, content)
 end
 
 function ListWindow:_setup_buf()
+	BaseWindow._setup_buf(self)
 	local buf = self:get_buf()
 	assert(buf)
 	vim.bo[buf].modifiable = false

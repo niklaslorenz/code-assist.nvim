@@ -21,23 +21,27 @@ local function parse_item(item)
 	return window_item
 end
 
+local function reload_window_content(conv)
+	local items = conv ~= nil and conv:get_content() or {}
+	Windows.Chat:clear()
+	for _, m in ipairs(items) do
+		Windows.Chat:add_item(parse_item(m))
+	end
+	local title = nil
+	if conv then
+		local type = conv:get_type()
+		if type == "listed" then
+			title = "[Conversation] " .. conv.name
+		elseif type == "project" then
+			title = "[" .. conv.name .. "]"
+		end
+	end
+	Windows.Chat:set_title(title)
+end
+
 function ConversationManagerControl.setup()
 	ConversationManager.observer.on_conversation_switch:subscribe(function(event)
-		local items = event.new_conversation ~= nil and event.new_conversation:get_content() or {}
-		Windows.Chat:clear()
-		for _, m in ipairs(items) do
-			Windows.Chat:add_item(parse_item(m))
-		end
-		local title = nil
-		if event.new_conversation then
-			local type = event.new_conversation:get_type()
-			if type == "listed" then
-				title = "[Conversation] " .. event.new_conversation.name
-			elseif type == "project" then
-				title = "[" .. event.new_conversation.name .. "]"
-			end
-		end
-		Windows.Chat:set_title(title)
+		reload_window_content(event.new_conversation)
 	end)
 
 	ConversationManager.observer.on_new_item:subscribe(function(event)
@@ -50,6 +54,10 @@ function ConversationManagerControl.setup()
 
 	ConversationManager.observer.on_item_deleted:subscribe(function(_)
 		Windows.Chat:remove_last_item()
+	end)
+
+	ConversationManager.observer.on_conversation_update:subscribe(function(event)
+		reload_window_content(event.conversation)
 	end)
 end
 

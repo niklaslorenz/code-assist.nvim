@@ -1,5 +1,7 @@
 local Interactions = {}
 
+local OptionsPopup = require("code-assist.ui.popups.options-popup")
+local ChatCompletionOptions = require("code-assist.chat-completion.options")
 local ChatCompletionConversation = require("code-assist.chat-completion.conversation")
 local Util = require("code-assist.util")
 local OptionsWindow = require("code-assist.ui.options-window")
@@ -338,6 +340,28 @@ function Interactions.open_model_select()
 		conv.model = model
 		vim.notify("Using model: " .. name)
 	end)
+end
+
+function Interactions.open_chat_completion_options_window()
+	local conv = ConversationManager:get_conversation()
+	if not conv then
+		vim.notify("No current conversation")
+		return
+	end
+	if conv:get_class() ~= ChatCompletionConversation:get_class() then
+		vim.notify("Conversation options only supported for chat completion conversations")
+		return
+	end
+	--- @cast conv ChatCompletionConversation
+	local option = ChatCompletionOptions:from_conversation(conv)
+	local win = OptionsPopup:new(option, "Conversation Options: " .. conv.name, function(_)
+		option:apply(conv)
+	end)
+	win:show({
+		origin = Windows.Chat,
+		float_height = 0.4,
+		float_width = 0.4,
+	})
 end
 
 return Interactions

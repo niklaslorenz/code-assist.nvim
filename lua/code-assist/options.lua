@@ -1,7 +1,7 @@
 --- @class CodeAssistOptions?
 --- @field default_model string?
 --- @field models table<string, string>?
---- @field system_message string?
+--- @field default_system_message string?
 --- @field user_chat_color string?
 --- @field assistant_chat_color string?
 --- @field data_path string?
@@ -13,6 +13,8 @@
 --- @field relative_chat_input_height number?
 --- @field project_conversation_path string?
 --- @field default_conversation_class "assistant"|"chat-completion"?
+--- @field agents table<string, string>?
+--- @field default_agent string?
 
 local Options = {
 	default_model = "gpt-4o-mini",
@@ -21,7 +23,8 @@ local Options = {
 		["gpt-4o"] = "gpt-4o",
 		["o4-mini"] = "o4-mini",
 	},
-	system_message = "You are a helpful programming assistant.",
+	default_system_message = "You are a helpful programming assistant.",
+	agents = {},
 	user_chat_color = "#a3be8c",
 	assistant_chat_color = "#88c0d0",
 	data_path = vim.fn.stdpath("data") .. "/code-assist",
@@ -35,6 +38,7 @@ local Options = {
 	relative_chat_input_width = 0.3,
 	project_conversation_path = ".conversations",
 	default_conversation_class = "chat-completion",
+	default_agent = nil,
 }
 
 return Options

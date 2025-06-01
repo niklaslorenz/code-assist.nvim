@@ -6,12 +6,19 @@ local Interface = require("code-assist.api.chat-completion")
 local Debouncer = require("code-assist.debouncer")
 local IO = require("code-assist.conversations.io")
 
+--- @alias ChatCompletionReasoningEffort "low"|"medium"|"high"
+
+--- @class ChatCompletion
+
 --- @class ChatCompletionConversation: Conversation
 --- Static Methods
 --- @field new fun(conv: ChatCompletionConversation, name: string?, path: string?, model: string?): ChatCompletionConversation
 --- Class Methods
 --- @field deserialize fun(conv: ChatCompletionConversation, data: table): ChatCompletionConversation
 --- Member Methods
+--- @field has_system_message fun(conv: ChatCompletionConversation): boolean
+--- @field set_system_message fun(conv: ChatCompletionConversation, msg: string)
+--- @field get_system_message fun(conv: ChatCompletionConversation): string?
 --- @field add_item fun(conv: ChatCompletionConversation, item: ChatCompletionMessage)
 --- @field extend_last_item fun(conv: ChatCompletionConversation, delta: string)
 --- @field prompt_response fun(conv: ChatCompletionConversation)
@@ -19,15 +26,40 @@ local IO = require("code-assist.conversations.io")
 --- @field get_content fun(conv: ChatCompletionConversation): ConversationItem[]
 --- Member Fields
 --- @field content ChatCompletionMessage[]
---- @field model string?
+--- @field agent string?
+--- @field reasoning_effort ChatCompletionReasoningEffort?
 --- @field private _current_operation Future<any>?
 local ChatCompletionConversation = Conversation.new_subclass("chat-completion")
 
-function ChatCompletionConversation:new(name, path, model)
+function ChatCompletionConversation:new(name, path, agent)
 	local new = Conversation.new(self, name, path) --[[@as ChatCompletionConversation]]
 	new.content = {}
-	new.model = model
+	new.agent = agent
 	return new
+end
+
+function ChatCompletionConversation:has_system_message()
+	return #self.content > 0 and self.content[1].role == "system"
+end
+
+function ChatCompletionConversation:replace_system_message(msg)
+	if not self.has_system_message(self) then
+		error("Conversation does not contain a system message")
+	end
+	self.content[1].text = msg
+	self:notify(function(obs)
+		obs.on_conversation_update:dispatch({
+			conversation = self,
+			name = "System Message Update",
+		})
+	end)
+end
+
+function ChatCompletionConversation:get_system_message()
+	if not self:has_system_message() then
+		return nil
+	end
+	return self.content[1].text
 end
 
 function ChatCompletionConversation:create_unlisted()
@@ -52,6 +84,9 @@ function ChatCompletionConversation:create_project(name, path)
 end
 
 function ChatCompletionConversation:add_item(item)
+	if #self.content > 1 and item.role == "system" then
+		error("Only the first message in a conversation can be a system message")
+	end
 	table.insert(self.content, item)
 	self:notify(function(obs)
 		obs.on_new_item:dispatch({
@@ -111,7 +146,7 @@ function ChatCompletionConversation:deserialize(data)
 		content[i] = Item.deserialize_subclass(item_data)
 	end
 	conv.content = content
-	conv.model = data.model
+	conv.agent = data.agent
 	return conv
 end
 
@@ -129,7 +164,7 @@ function ChatCompletionConversation:prompt_response()
 	end, 250)
 	]]
 
-	local request = Interface.post_streaming_request(self.model, self.content, function(chunk)
+	local request = Interface.post_streaming_request(self.agent, self.content, function(chunk)
 		local delta = chunk.content
 		if not chunk.role then
 			if delta then
@@ -183,7 +218,7 @@ function ChatCompletionConversation:serialize()
 		serialized_content[i] = item:serialize()
 	end
 	data.content = serialized_content
-	data.model = self.model
+	data.agent = self.agent
 	return data
 end
 

@@ -10,6 +10,29 @@ function Util.project_conversations_enabled()
 end
 
 --- @return string
+function Util.get_default_agent_prompt()
+	if Options.default_agent then
+		return Util.get_agent_prompt(Options.default_agent) or Options.default_system_message
+	end
+	return Options.default_system_message
+end
+
+--- @return string[]
+function Util.get_agent_names()
+	local names = {}
+	for name, _ in pairs(Options.agents) do
+		table.insert(names, name)
+	end
+	return names
+end
+
+--- @param name string
+--- @return string?
+function Util.get_agent_prompt(name)
+	return name and Options.agents[name] or Util.get_default_agent_prompt()
+end
+
+--- @return string
 function Util.get_default_model_name()
 	local name = Options.default_model
 	if not name then
@@ -28,7 +51,7 @@ function Util.get_available_model_names()
 end
 
 --- @param name string
---- @return string
+--- @return string?
 function Util.get_model_id(name)
 	return Options.models[name]
 end

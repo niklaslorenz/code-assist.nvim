@@ -13,6 +13,8 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field relative_height number?
 --- @field origin integer|BaseWindow?
 --- @field orientation WindowOrientation?
+--- @field float_width number?
+--- @field float_height number?
 
 --- @class BaseWindow
 --- Constructor
@@ -36,6 +38,7 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- Public Fields
 --- @field on_visibility_change EventDispatcher<WindowStatus>
 --- @field on_buffer_setup EventDispatcher<WindowBufferSetupEvent>
+--- @field track_parent_window boolean
 --- Private fields
 --- @field _augroup integer?
 --- @field private _buf_id integer?
@@ -43,6 +46,7 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field private _last_show_opts WindowShowOptions
 --- @field private _orientation WindowOrientation?
 --- @field private _default_orientation WindowOrientation
+--- @field private _parent_window integer?
 --- @field private _title string?
 local BaseWindow = {}
 BaseWindow.__index = BaseWindow
@@ -54,6 +58,7 @@ function BaseWindow:new(default_orientation)
 	local new = {
 		on_visibility_change = EventDispatcher:new(),
 		on_buffer_setup = EventDispatcher:new(),
+		track_parent_window = false,
 		_augroup = nil,
 		_buf_id = nil,
 		_win_id = nil,
@@ -150,6 +155,9 @@ function BaseWindow:show(opts)
 		end
 	end
 
+	if self.track_parent_window then
+		self._parent_window = vim.api.nvim_get_current_win()
+	end
 	local origin_window = opts.origin
 	if origin_window then
 		if type(origin_window) ~= "number" then
@@ -180,8 +188,8 @@ function BaseWindow:show(opts)
 			win = origin_window,
 		})
 	else
-		local w = math.floor(vim.o.columns * 0.6)
-		local h = math.floor(vim.o.lines * 0.6)
+		local w = math.floor(vim.o.columns * (opts.float_width or 0.6))
+		local h = math.floor(vim.o.lines * (opts.float_height or 0.6))
 		local row = math.floor((vim.o.lines - h) / 2)
 		local col = math.floor((vim.o.columns - w) / 2)
 		local title_pos = nil
@@ -215,6 +223,10 @@ function BaseWindow:hide()
 	self._win_id = nil
 	self._orientation = nil
 	if was_closed then
+		if self._parent_window and vim.api.nvim_win_is_valid(self._parent_window) then
+			vim.api.nvim_set_current_win(self._parent_window)
+		end
+		self._parent_window = nil
 		self.on_visibility_change:dispatch("hidden")
 	end
 end

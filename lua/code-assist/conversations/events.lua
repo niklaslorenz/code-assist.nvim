@@ -3,6 +3,9 @@
 --- @class ConversationEvent
 --- @field conversation Conversation
 ---
+--- @class ConversationUpdateEvent: ConversationEvent
+--- @field name string
+---
 --- @class ConversationNewItemEvent: ConversationEvent
 --- @field item ConversationItem
 ---

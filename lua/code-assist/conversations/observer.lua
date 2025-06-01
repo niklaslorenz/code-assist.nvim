@@ -10,6 +10,7 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 --- @field on_item_extended EventDispatcher<ConversationItemExtendedEvent>
 --- @field on_item_deleted EventDispatcher<ConversationItemDeletedEvent>
 --- @field on_conversation_switch EventDispatcher<ConversationSwitchEvent>
+--- @field on_conversation_update EventDispatcher<ConversationUpdateEvent>
 --- @field private _observed Conversation?
 local ConversationObserver = {}
 ConversationObserver.__index = ConversationObserver
@@ -20,6 +21,7 @@ function ConversationObserver:new()
 		on_item_extended = EventDispatcher:new(),
 		on_item_deleted = EventDispatcher:new(),
 		on_conversation_switch = EventDispatcher:new(),
+		on_conversation_update = EventDispatcher:new(),
 		_observed = nil,
 	}
 	setmetatable(new, self)

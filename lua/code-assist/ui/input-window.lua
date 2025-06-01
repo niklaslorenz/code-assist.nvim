@@ -3,7 +3,7 @@ local EventDispatcher = require("code-assist.event-dispatcher")
 
 --- @class InputWindow : BaseWindow
 --- @field new fun(win: InputWindow, orientation: WindowOrientation?): InputWindow
---- @field commit fun(win: InputWindow)
+--- @field submit fun(win: InputWindow)
 --- @field clear fun(win: InputWindow)
 --- @field on_submit EventDispatcher<string>
 local InputWindow = {}
@@ -18,6 +18,7 @@ function InputWindow:new(orientation)
 end
 
 function InputWindow:_setup_buf()
+	BaseWindow._setup_buf(self)
 	local buf = self:get_buf()
 	assert(buf)
 	vim.bo[buf].filetype = "markdown"
@@ -26,7 +27,7 @@ function InputWindow:_setup_buf()
 	vim.bo[buf].swapfile = false
 end
 
-function InputWindow:commit()
+function InputWindow:submit()
 	local buf = self:get_buf()
 	assert(buf)
 	local content = table.concat(vim.api.nvim_buf_get_lines(buf, 0, -1, true), "\n")

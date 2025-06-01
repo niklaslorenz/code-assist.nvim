@@ -51,7 +51,7 @@ end
 --- @param buffer integer buffer index
 function Keymaps.setup_chat_buffer_keymaps(buffer)
 	add_keymap("q", Interactions.close_chat_window, "Close chat window", { buffer = buffer })
-	add_keymap("o", Interactions.open_chat_filter_window, "Open Chat Filter", { buffer = buffer })
+	add_keymap("o", Interactions.open_chat_completion_options_window, "Open Conversation Options", { buffer = buffer })
 	add_keymap("<CR>", Interactions.goto_message_input, "Open message prompt", { buffer = buffer })
 	add_keymap("i", Interactions.goto_message_input, "Open message prompt", { buffer = buffer })
 	add_keymap("r", Interactions.rename_current_conversation, "Rename conversation", { buffer = buffer })
@@ -66,7 +66,7 @@ end
 function Keymaps.setup_chat_input_buffer_keymaps(buffer)
 	add_keymap("q", Interactions.close_chat_window, "Close chat window", { buffer = buffer })
 	add_keymap("<CR><CR>", function()
-		Windows.ChatInput:commit()
+		Windows.ChatInput:submit()
 		Windows.Chat:scroll_to_bottom()
 	end, "Commit chat input", { buffer = buffer }, { "n", "v", "i" })
 end
