@@ -59,7 +59,6 @@ function Keymaps.setup_chat_buffer_keymaps(buffer)
 	add_keymap("dm", Interactions.delete_last_message, "Delete last message", { buffer = buffer })
 	add_keymap("[c", Interactions.scroll_to_previous_begin, "previous message begin", { buffer = buffer })
 	add_keymap("]c", Interactions.scroll_to_next_begin, "next message begin", { buffer = buffer })
-	add_keymap("m", Interactions.open_model_select, "Select Model", { buffer = buffer })
 end
 
 --- @param buffer integer buffer index

@@ -5,55 +5,45 @@ local Options = require("code-assist.options")
 local has_whichkey, WhichKey = pcall(require, "which-key")
 local has_neo_tree, NeoTreeManager = pcall(require, "neo-tree.sources.manager")
 
+local agent_map = {}
+
+function Util.setup()
+	agent_map = {}
+	for _, agent in ipairs(Options.agents) do
+		agent_map[agent.name] = agent
+	end
+end
+
 function Util.project_conversations_enabled()
 	return has_neo_tree and Options.project_conversation_path ~= nil
 end
 
---- @return string
-function Util.get_default_agent_prompt()
-	if Options.default_agent then
-		return Util.get_agent_prompt(Options.default_agent) or Options.default_system_message
+--- @param name string? Agent name
+--- @return ca.chat-completion.Agent
+function Util.get_agent(name)
+	name = name or Options.default_agent
+	if name then
+		local agent = agent_map[name]
+		if agent then
+			return agent
+		end
 	end
-	return Options.default_system_message
+	--- @type ca.chat-completion.Agent
+	return {
+		name = "",
+		model = Options.default_model,
+		system_message = Options.default_system_message,
+		reasoning_effort = nil,
+	}
 end
 
 --- @return string[]
 function Util.get_agent_names()
 	local names = {}
-	for name, _ in pairs(Options.agents) do
+	for name, _ in pairs(agent_map) do
 		table.insert(names, name)
 	end
 	return names
-end
-
---- @param name string
---- @return string?
-function Util.get_agent_prompt(name)
-	return name and Options.agents[name] or Util.get_default_agent_prompt()
-end
-
---- @return string
-function Util.get_default_model_name()
-	local name = Options.default_model
-	if not name then
-		error("Could not find default model")
-	end
-	return name
-end
-
---- @return string[]
-function Util.get_available_model_names()
-	local names = {}
-	for name, _ in pairs(Options.models) do
-		table.insert(names, name)
-	end
-	return names
-end
-
---- @param name string
---- @return string?
-function Util.get_model_id(name)
-	return Options.models[name]
 end
 
 function Util.get_default_conversation_class()

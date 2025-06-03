@@ -8,7 +8,7 @@
 --- Member Methods
 --- @field print fun(item: ConversationItem): string?
 --- @field serialize fun(item: ConversationItem): table
---- @field get_user_descriptor fun(item: ConversationItem): string
+--- @field get_channel_descriptor fun(item: ConversationItem): string
 --- Static Attributes
 --- @field protected _class string
 --- @field private _subclasses table<string, ConversationItem>
@@ -72,7 +72,7 @@ function ConversationItem:serialize()
 	return data
 end
 
-function ConversationItem:get_user_descriptor()
+function ConversationItem:get_channel_descriptor()
 	return self.channel
 end
 

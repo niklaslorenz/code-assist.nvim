@@ -310,36 +310,11 @@ function Interactions.open_chat_filter_window()
 	local win = OptionsWindow:new(Windows.Chat:get_filters(), "*Chat Channels:*", "float")
 	win.on_submit:subscribe(function(event)
 		for k, v in pairs(event) do
-			print("New filter" .. k .. ": " .. (v and "true" or "false"))
 			Windows.Chat:set_filter(k, v)
-			Windows.Chat:refresh_content()
 		end
+		Windows.Chat:refresh_content()
 	end)
 	win:show()
-end
-
-function Interactions.open_model_select()
-	local conv = ConversationManager.get_conversation()
-	if not conv then
-		vim.notify("No current conversation")
-		return
-	end
-	if conv:get_class() ~= ChatCompletionConversation:get_class() then
-		vim.notify("Model selection only available for chat completion conversations")
-		return
-	end
-	--- @cast conv ChatCompletionConversation
-	local names = Util.get_available_model_names()
-	vim.ui.select(names, {
-		prompt = "Select Model",
-	}, function(name, idx)
-		if idx == nil then
-			return
-		end
-		local model = names[idx]
-		conv.model = model
-		vim.notify("Using model: " .. name)
-	end)
 end
 
 function Interactions.open_chat_completion_options_window()
@@ -354,7 +329,7 @@ function Interactions.open_chat_completion_options_window()
 	end
 	--- @cast conv ChatCompletionConversation
 	local option = ChatCompletionOptions:from_conversation(conv)
-	local win = OptionsPopup:new(option, "Conversation Options: " .. conv.name, function(_)
+	local win = OptionsPopup:new(option, "Conversation Options: " .. (conv.name or "<unlisted>"), function(_)
 		option:apply(conv)
 	end)
 	win:show({

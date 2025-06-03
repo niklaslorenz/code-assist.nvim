@@ -1,0 +1,9 @@
+--- @meta
+---
+--- @alias ca.chat-completion.AgentReasoningEffort "low"|"medium"|"high"
+---
+--- @class ca.chat-completion.Agent
+--- @field name string
+--- @field model string
+--- @field system_message string
+--- @field reasoning_effort ca.chat-completion.AgentReasoningEffort?

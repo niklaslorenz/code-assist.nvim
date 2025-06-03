@@ -1,5 +1,6 @@
+local Util = require("code-assist.util")
 local Message = require("code-assist.chat-completion.message")
-local Options = require("code-assist.options")
+local SystemMessage = require("code-assist.chat-completion.system-message")
 local Conversation = require("code-assist.conversations.conversation")
 local Item = require("code-assist.conversations.item")
 local Interface = require("code-assist.api.chat-completion")
@@ -11,23 +12,28 @@ local IO = require("code-assist.conversations.io")
 --- @class ChatCompletion
 
 --- @class ChatCompletionConversation: Conversation
---- Static Methods
---- @field new fun(conv: ChatCompletionConversation, name: string?, path: string?, model: string?): ChatCompletionConversation
 --- Class Methods
+--- @field new fun(conv: ChatCompletionConversation, name: string?, path: string?, agent: string?): ChatCompletionConversation
+--- @field create_unlisted fun(conv: ChatCompletionConversation): ChatCompletionConversation
+--- @field create_listed fun(conv: ChatCompletionConversation, name: string): ChatCompletionConversation
+--- @field create_project fun(conv: ChatCompletionConversation, name: string, path: string?): ChatCompletionConversation
 --- @field deserialize fun(conv: ChatCompletionConversation, data: table): ChatCompletionConversation
 --- Member Methods
---- @field has_system_message fun(conv: ChatCompletionConversation): boolean
---- @field set_system_message fun(conv: ChatCompletionConversation, msg: string)
---- @field get_system_message fun(conv: ChatCompletionConversation): string?
 --- @field add_item fun(conv: ChatCompletionConversation, item: ChatCompletionMessage)
 --- @field extend_last_item fun(conv: ChatCompletionConversation, delta: string)
+--- @field can_remove_last_item fun(conv: ChatCompletionConversation): boolean
+--- @field remove_last_item fun(conv: ChatCompletionConversation): boolean
 --- @field prompt_response fun(conv: ChatCompletionConversation)
 --- @field serialize fun(conv: ChatCompletionConversation): table
 --- @field get_content fun(conv: ChatCompletionConversation): ConversationItem[]
+--- @field is_ready fun(conv: ChatCompletionConversation): boolean
+--- @field can_handle_text fun(conv: ChatCompletionConversation): boolean
+--- @field handle_user_input_text fun(conv: ChatCompletionConversation, text: string): boolean
+--- @field handle_text_context fun(conv: ChatCompletionConversation, context: string): boolean
+--- @field set_agent fun(conv: ChatCompletionConversation, agent: string?)
 --- Member Fields
 --- @field content ChatCompletionMessage[]
 --- @field agent string?
---- @field reasoning_effort ChatCompletionReasoningEffort?
 --- @field private _current_operation Future<any>?
 local ChatCompletionConversation = Conversation.new_subclass("chat-completion")
 
@@ -38,55 +44,33 @@ function ChatCompletionConversation:new(name, path, agent)
 	return new
 end
 
-function ChatCompletionConversation:has_system_message()
-	return #self.content > 0 and self.content[1].role == "system"
-end
-
-function ChatCompletionConversation:replace_system_message(msg)
-	if not self.has_system_message(self) then
-		error("Conversation does not contain a system message")
-	end
-	self.content[1].text = msg
-	self:notify(function(obs)
-		obs.on_conversation_update:dispatch({
-			conversation = self,
-			name = "System Message Update",
-		})
-	end)
-end
-
-function ChatCompletionConversation:get_system_message()
-	if not self:has_system_message() then
-		return nil
-	end
-	return self.content[1].text
-end
-
 function ChatCompletionConversation:create_unlisted()
 	local new = self:new()
-	local system_message = Message:new("system", "system", Options.system_message)
-	new:add_item(system_message)
 	return new
 end
 
 function ChatCompletionConversation:create_listed(name)
 	local new = self:new(name)
-	local system_message = Message:new("system", "system", Options.system_message)
-	new:add_item(system_message)
 	return new
 end
 
 function ChatCompletionConversation:create_project(name, path)
 	local new = self:new(name, path)
-	local system_message = Message:new("system", "system", Options.system_message)
-	new:add_item(system_message)
 	return new
 end
 
-function ChatCompletionConversation:add_item(item)
-	if #self.content > 1 and item.role == "system" then
-		error("Only the first message in a conversation can be a system message")
+function ChatCompletionConversation:deserialize(data)
+	local conv = Conversation.deserialize(self, data) --[[@as ChatCompletionConversation]]
+	local content = {}
+	for i, item_data in ipairs(data.content) do
+		content[i] = Item.deserialize_subclass(item_data)
 	end
+	conv.content = content
+	conv.agent = data.agent
+	return conv
+end
+
+function ChatCompletionConversation:add_item(item)
 	table.insert(self.content, item)
 	self:notify(function(obs)
 		obs.on_new_item:dispatch({
@@ -94,33 +78,6 @@ function ChatCompletionConversation:add_item(item)
 			item = item,
 		})
 	end)
-end
-
-function ChatCompletionConversation:can_remove_last_item()
-	if #self.content == 0 then
-		return false
-	end
-	local item = self.content[#self.content]
-	if item.role == "system" then
-		return false
-	end
-	return true
-end
-
-function ChatCompletionConversation:remove_last_item()
-	if not self:can_remove_last_item() then
-		return false
-	end
-	local index = #self.content
-	local item = self.content[index]
-	table.remove(self.content, index)
-	self:notify(function(obs)
-		obs.on_item_deleted:dispatch({
-			conversation = self,
-			item = item,
-		})
-	end)
-	return true
 end
 
 function ChatCompletionConversation:extend_last_item(delta)
@@ -139,15 +96,24 @@ function ChatCompletionConversation:extend_last_item(delta)
 	end)
 end
 
-function ChatCompletionConversation:deserialize(data)
-	local conv = Conversation.deserialize(self, data) --[[@as ChatCompletionConversation]]
-	local content = {}
-	for i, item_data in ipairs(data.content) do
-		content[i] = Item.deserialize_subclass(item_data)
+function ChatCompletionConversation:can_remove_last_item()
+	return #self.content > 0
+end
+
+function ChatCompletionConversation:remove_last_item()
+	if not self:can_remove_last_item() then
+		return false
 	end
-	conv.content = content
-	conv.agent = data.agent
-	return conv
+	local index = #self.content
+	local item = self.content[index]
+	table.remove(self.content, index)
+	self:notify(function(obs)
+		obs.on_item_deleted:dispatch({
+			conversation = self,
+			item = item,
+		})
+	end)
+	return true
 end
 
 function ChatCompletionConversation:prompt_response()
@@ -171,7 +137,12 @@ function ChatCompletionConversation:prompt_response()
 				self:extend_last_item(delta)
 			end
 		else
-			self:add_item(Message:new(chunk.role, "assistant", delta or ""))
+			--- @type string?
+			local name = Util.get_agent(self.agent).name
+			if name == "" then
+				name = nil
+			end
+			self:add_item(Message:new(chunk.role, "assistant", delta or "", name))
 		end
 	end, function(_) end)
 	if self:get_type() ~= "unlisted" then
@@ -183,6 +154,28 @@ function ChatCompletionConversation:prompt_response()
 		end)
 	end
 	self._current_operation = request
+end
+
+function ChatCompletionConversation:serialize()
+	local data = Conversation.serialize(self)
+	local serialized_content = {}
+	for i, item in ipairs(self.content) do
+		serialized_content[i] = item:serialize()
+	end
+	data.content = serialized_content
+	data.agent = self.agent
+	return data
+end
+
+function ChatCompletionConversation:get_content()
+	--- @type ChatCompletionSystemMessage
+	local agent_prompt = SystemMessage:new(Util.get_agent(self.agent).system_message)
+	--- @type ConversationItem[]
+	local items = { agent_prompt }
+	for i, item in ipairs(self.content) do
+		items[i + 1] = item
+	end
+	return items
 end
 
 function ChatCompletionConversation:is_ready()
@@ -211,19 +204,17 @@ function ChatCompletionConversation:handle_text_context(context)
 	return true
 end
 
-function ChatCompletionConversation:serialize()
-	local data = Conversation.serialize(self)
-	local serialized_content = {}
-	for i, item in ipairs(self.content) do
-		serialized_content[i] = item:serialize()
+function ChatCompletionConversation:set_agent(new_agent)
+	if self.agent == new_agent then
+		return
 	end
-	data.content = serialized_content
-	data.agent = self.agent
-	return data
-end
-
-function ChatCompletionConversation:get_content()
-	return self.content
+	self.agent = new_agent
+	self:notify(function(obs)
+		obs.on_conversation_update:dispatch({
+			name = "option change",
+			conversation = self,
+		})
+	end)
 end
 
 return ChatCompletionConversation

@@ -56,22 +56,18 @@ ChatCompletionInterface.post_request = function(model, messages, callback)
 	return status
 end
 
---- @param model_name string?
+--- @param agent_name string?
 --- @param messages ChatCompletionMessage[]
 --- @param on_chunk_ready fun(new_chunk: ChatCompletion)
 --- @param on_finish? fun(status: ChatCompletion?)
 --- @return Future<ChatCompletion?> status
-function ChatCompletionInterface.post_streaming_request(model_name, messages, on_chunk_ready, on_finish)
-	if not model_name then
-		model_name = Util.get_default_model_name()
-	end
-	local model = Util.get_model_id(model_name)
-	if not model then
-		error("Could not get model id for model " .. model_name)
-	end
+function ChatCompletionInterface.post_streaming_request(agent_name, messages, on_chunk_ready, on_finish)
+	local agent = Util.get_agent(agent_name)
+
 	local payload = vim.fn.json_encode({
-		model = model,
-		messages = Parser.encode_message_array(messages),
+		model = agent.model,
+		messages = Parser.encode_message_array(messages, agent.system_message),
+		reasoning_effort = agent.reasoning_effort,
 		stream = true,
 	})
 

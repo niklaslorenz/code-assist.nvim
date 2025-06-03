@@ -126,11 +126,20 @@ function ChatCompletionParser.parse_chat_completion_chunk(line)
 end
 
 --- @param messages ChatCompletionMessage[]
-function ChatCompletionParser.encode_message_array(messages)
+--- @param system_prompt string?
+function ChatCompletionParser.encode_message_array(messages, system_prompt)
 	--- @type {role: ChatCompletionRole, content: string}[]
 	local encoded = {}
+	local offset = 0
+	if system_prompt then
+		encoded[1] = {
+			content = system_prompt,
+			role = "system",
+		}
+		offset = 1
+	end
 	for i, message in ipairs(messages) do
-		encoded[i] = {
+		encoded[i + offset] = {
 			role = message.role,
 			content = message.text,
 		}

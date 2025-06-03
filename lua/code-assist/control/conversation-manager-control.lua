@@ -5,7 +5,7 @@ local Windows = require("code-assist.ui.window-instances")
 
 --- @param item ConversationItem
 local function parse_item(item)
-	local header = "*" .. item:get_user_descriptor() .. ":*"
+	local header = "*" .. item:get_channel_descriptor() .. ":*"
 
 	local item_lines = { "___", header }
 	local content = item:print() or "<empty>"
