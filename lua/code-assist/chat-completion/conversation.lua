@@ -119,22 +119,21 @@ end
 function ChatCompletionConversation:prompt_response()
 	assert(self:is_ready())
 
-	--[[
 	local debouncer = Debouncer:new(function()
 		return {}
 	end, function(accumulator, new_element)
 		table.insert(accumulator, new_element)
 	end, function(accumulator)
-		local text = vim.fn.join(accumulator)
+		local text = vim.fn.join(accumulator, "")
 		self:extend_last_item(text)
-	end, 250)
-	]]
+	end, 100)
 
 	local request = Interface.post_streaming_request(self.agent, self.content, function(chunk)
 		local delta = chunk.content
 		if not chunk.role then
 			if delta then
-				self:extend_last_item(delta)
+				debouncer:handle(delta)
+				-- self:extend_last_item(delta)
 			end
 		else
 			--- @type string?
@@ -142,6 +141,7 @@ function ChatCompletionConversation:prompt_response()
 			if name == "" then
 				name = nil
 			end
+			debouncer:push()
 			self:add_item(Message:new(chunk.role, "assistant", delta or "", name))
 		end
 	end, function(_) end)
@@ -151,6 +151,7 @@ function ChatCompletionConversation:prompt_response()
 			if not ok then
 				vim.notify("Error while saving conversation: " .. reason, vim.log.levels.ERROR)
 			end
+			debouncer:close()
 		end)
 	end
 	self._current_operation = request

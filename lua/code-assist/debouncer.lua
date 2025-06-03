@@ -25,7 +25,7 @@ function Debouncer:new(make_acc, acc_fn, handler, timer)
     _acc_fn = acc_fn,
     _handler = handler,
     _timer = vim_timer,
-    _is_ready = false,
+    _is_ready = true,
     _interval = timer,
   }
   setmetatable(new, self)
@@ -33,25 +33,20 @@ function Debouncer:new(make_acc, acc_fn, handler, timer)
 end
 
 function Debouncer:handle(item)
-  if not self._is_ready then
-    if not self._accumulator then
-      self._accumulator = self._make_acc()
-    end
-    self._accumulator = self._acc_fn(self._accumulator, item)
-  else
+  if self._is_ready then
+    self._accumulator = self._make_acc()
     self._is_ready = false
     self._timer:start(
       self._interval,
-      self._interval,
+      0,
       vim.schedule_wrap(function()
-        if not self._is_ready then
-          if not self:push() then
-            self._timer:stop()
-          end
-        end
+        self:push()
+        self._is_ready = true
+        self._accumulator = nil
       end)
     )
   end
+  self._acc_fn(self._accumulator, item)
 end
 
 function Debouncer:push()
