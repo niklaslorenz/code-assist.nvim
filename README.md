@@ -9,19 +9,18 @@ Roadmap:
 - [x] Refactor Chat window
   - [x] Message Tracking
 - [x] Message Input Window
-- [-] Project conversations
+- [x] Project conversations
 - [ ] Assistant basic threads
 - [ ] tool calls
 - [x] Refactor Select Window
 
 Bucket List:
 
-- [ ] Put selected context into its own channel
+- [x] Put selected context into its own channel
 - [ ] Conversation length management
   - [ ] Conversation token length tracking
   - [ ] Make sure that the system message is not truncated
 - [x] Define location for user issued requests to the conversation manager
-  - > ui/interactions.lua
   - Handles global and window keymap actions
   - Ensures preconditions
   - Notifies user on error
@@ -33,7 +32,7 @@ Bucket List:
   - [x] plugin opt for default sorting order
 - [x] Dynamic message filters
   - [x] Plugin opt for default filter
-- [ ] implement a on_msg_delete event so the chat window does not have to redraw the conversation
+- [x] implement a on_msg_delete event so the chat window does not have to redraw the conversation
   - needs message tracking
 - [x] implement a chat completions request object
   - [x] put the streaming request into chat-completions and keep the interface.streaming.lua file
@@ -44,7 +43,7 @@ Bucket List:
 - [x] (Refatoring) Cleanup chat-window-control
 - [x] Chat Window Title
 - [x] Multi Line Inputs
-- [-] Keymaps
+- [x] Keymaps
   - [x] leader + a + b -> scroll to bottom
   - [x] Previous and next message start/end with \[c, \[C \]c \]C
     - needs message tracking
@@ -53,7 +52,7 @@ Bucket List:
   - [x] Select conversation from chat window
   - [x] Change chat window size in split mode
   - [x] Change delete keymap as it is already used by the delete feature -> leads to delay
-- [ ] Project Conversations
+- [x] Project Conversations
 - [x] Plugin opts
   - [x] model
   - [x] system message

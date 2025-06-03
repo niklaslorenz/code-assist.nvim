@@ -236,7 +236,13 @@ function Interactions.rename_current_conversation()
 		if not input then
 			return
 		end
-		local ok, msg = ConversationIO.rename_conversation(conversation, input)
+		local ok, msg
+		if conversation:get_type() ~= "unlisted" then
+			ok, msg = ConversationIO.rename_conversation(conversation, input)
+		else
+			conversation.name = input
+			ok, msg = ConversationIO.save_conversation(conversation)
+		end
 		if not ok then
 			vim.notify(msg or "Unknown error", vim.log.levels.ERROR)
 		end
