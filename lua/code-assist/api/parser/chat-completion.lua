@@ -121,7 +121,9 @@ function ChatCompletionParser.parse_chat_completion_chunk(line)
 		return nil, true
 	end
 	local decoded = vim.fn.json_decode(data)
-	assert(decoded.object == "chat.completion.chunk")
+	if decoded.object ~= "chat.completion.chunk" then
+		vim.notify("Unexpected chunk type: " .. decoded.object, vim.log.levels.WARN)
+	end
 	return parse_completion(decoded), false
 end
 
